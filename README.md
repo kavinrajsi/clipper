@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Clipper
 
-## Getting Started
+A marketplace connecting **brands** and **clippers** (YouTube creators). Brands post campaigns and fund them via Razorpay; clippers connect a YouTube channel, apply to campaigns, submit clips, and get paid once approved.
 
-First, run the development server:
+## Tech stack
+
+- **Next.js 16** (App Router) — note: `proxy.js`, not `middleware.ts` (renamed in this version)
+- **React 19**, **Tailwind CSS v4**
+- **shadcn/ui** on **base-ui** (not Radix) — composition uses the `render` prop, not `asChild`
+- **Supabase** — Postgres, Auth (Google OAuth only), Storage
+- **Razorpay Route** — campaign funding, held transfers, payout release (not Razorpay's separate "Escrow" product)
+
+See `AGENTS.md` for the full set of project-specific conventions, RLS patterns, and known gaps.
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create `.env.local` with:
 
-## Learn More
+```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=             # sb_secret_... — required for /admin and payout routes (server-only, never NEXT_PUBLIC_)
 
-To learn more about Next.js, take a look at the following resources:
+# Google OAuth — used for both "Sign in with Google" and the YouTube connector
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Razorpay Route — real API calls 401 until these are real (test or live) keys
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+NEXT_PUBLIC_RAZORPAY_KEY_ID=     # same value as RAZORPAY_KEY_ID, exposed for Razorpay Checkout.js
+RAZORPAY_WEBHOOK_SECRET=        # verifies incoming webhook payloads (/api/payments/webhook)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Super admin — hardcoded owner account, not a DB role
+SUPER_ADMIN_EMAIL=
+```
 
-## Deploy on Vercel
+### Database
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**There is no local migration history** (`supabase/migrations/` doesn't exist in this repo — see `AGENTS.md`). The schema lives only in the live Supabase project. To make schema changes, run SQL directly against that project (SQL Editor, or Supabase MCP tools if connected) rather than expecting a `supabase migration` workflow to already be set up.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Route map
+
+**Public** (`src/app/(app)/`)
+- `/` — marketing home page
+- `/login` — Google sign-in
+- `/privacy`, `/terms`, `/clipper-terms`, `/faq`, `/support` (`src/app/(legal)/`)
+
+**Protected app** (`src/app/(protected)/`) — role-branched sidebar, see `AGENTS.md` for exactly which routes are role-gated at the route level vs. just nav-hidden
+- Clipper: `/dashboard`, `/connectors` (YouTube), `/analytics`, `/clipper-profile`, `/payout-account`
+- Brand: `/campaigns` (also the clipper's campaign-browse view), `/clippers` (directory), `/brand-profile`
+- Everyone: `/profile` (name/avatar/role switch)
+- Super admin only: `/admin`
+
+## Scripts
+
+- `npm run dev` — start the dev server
+- `npm run build` — production build
+- `npm run start` — run the production build
+- `npm run lint` — ESLint

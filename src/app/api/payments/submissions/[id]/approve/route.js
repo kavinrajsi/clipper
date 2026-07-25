@@ -46,6 +46,13 @@ export async function POST(request, { params }) {
     );
   }
 
+  const { data: connection } = await admin
+    .from("youtube_connections")
+    .select("payout_multiplier")
+    .eq("user_id", submission.clipper_id)
+    .single();
+  const payoutMultiplier = connection?.payout_multiplier ?? 1.0;
+
   let amount = campaign.payout_rate;
 
   if (campaign.payout_structure === "per_view") {
@@ -64,6 +71,8 @@ export async function POST(request, { params }) {
 
     amount = (viewCount / 1000) * campaign.payout_rate;
   }
+
+  amount = Math.round(amount * payoutMultiplier * 100) / 100;
 
   if (campaign.budget) {
     const { data: campaignApplications } = await admin
@@ -104,14 +113,17 @@ export async function POST(request, { params }) {
       amount
     );
 
-    const { error: payoutError } = await admin.from("campaign_payouts").insert({
-      application_id: submission.application_id,
-      clipper_id: submission.clipper_id,
-      amount,
-      razorpay_transfer_id: transfer.id,
-      status: "held",
-      held_at: new Date().toISOString(),
-    });
+    const { error: payoutError } = await admin.from("campaign_payouts").upsert(
+      {
+        application_id: submission.application_id,
+        clipper_id: submission.clipper_id,
+        amount,
+        razorpay_transfer_id: transfer.id,
+        status: "held",
+        held_at: new Date().toISOString(),
+      },
+      { onConflict: "application_id" }
+    );
 
     if (payoutError) throw payoutError;
 
@@ -119,12 +131,15 @@ export async function POST(request, { params }) {
   } catch (err) {
     console.error("Razorpay transfer creation failed", err);
 
-    await admin.from("campaign_payouts").insert({
-      application_id: submission.application_id,
-      clipper_id: submission.clipper_id,
-      amount,
-      status: "failed",
-    });
+    await admin.from("campaign_payouts").upsert(
+      {
+        application_id: submission.application_id,
+        clipper_id: submission.clipper_id,
+        amount,
+        status: "failed",
+      },
+      { onConflict: "application_id" }
+    );
 
     return NextResponse.json({ error: "Couldn't create the payout transfer." }, { status: 502 });
   }

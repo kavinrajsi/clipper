@@ -70,6 +70,10 @@ function formatRate(campaign) {
 export function CampaignCard({ campaign, role, applicationStatus }) {
   const router = useRouter()
   const supabase = createClient()
+  const statusOptions =
+    campaign.funding_status === "paid"
+      ? STATUS_OPTIONS
+      : STATUS_OPTIONS.filter((option) => option.value !== "active")
   const [statusLoading, setStatusLoading] = useState(false)
   const [applyOpen, setApplyOpen] = useState(false)
   const [message, setMessage] = useState("")
@@ -78,6 +82,7 @@ export function CampaignCard({ campaign, role, applicationStatus }) {
   const [error, setError] = useState(null)
 
   async function handleStatusChange(nextStatus) {
+    setError(null)
     setStatusLoading(true)
     const { error: updateError } = await supabase
       .from("campaigns")
@@ -85,9 +90,12 @@ export function CampaignCard({ campaign, role, applicationStatus }) {
       .eq("id", campaign.id)
     setStatusLoading(false)
 
-    if (!updateError) {
-      router.refresh()
+    if (updateError) {
+      setError(updateError.message)
+      return
     }
+
+    router.refresh()
   }
 
   function handleFundCampaign() {
@@ -169,25 +177,30 @@ export function CampaignCard({ campaign, role, applicationStatus }) {
         {role === "brand" && (
           <>
             <CampaignForm brandId={campaign.brand_id} campaign={campaign} />
-            <Select
-              value={campaign.status}
-              onValueChange={handleStatusChange}
-              items={STATUS_OPTIONS}
-              disabled={statusLoading}
-            >
-              <SelectTrigger size="sm" className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-1">
+              <Select
+                value={campaign.status}
+                onValueChange={handleStatusChange}
+                items={statusOptions}
+                disabled={statusLoading}
+              >
+                <SelectTrigger size="sm" className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {statusOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {campaign.funding_status !== "paid" && (
+                <p className="text-xs text-muted-foreground">Fund the campaign to activate it.</p>
+              )}
+            </div>
             <Button
               variant="outline"
               size="sm"

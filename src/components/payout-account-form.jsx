@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,7 @@ import { Spinner } from "@/components/ui/spinner"
 const STATUS_LABEL = {
   active: "Active",
   pending: "Pending",
+  under_review: "Under review",
   failed: "Failed — try again",
 }
 
@@ -46,6 +47,27 @@ export function PayoutAccountForm({ user, payoutAccount, className, ...props }) 
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState(payoutAccount?.status ?? null)
+  const [checkingStatus, setCheckingStatus] = useState(false)
+
+  async function checkStatus() {
+    setCheckingStatus(true)
+    const response = await fetch("/api/payments/payout-account/check-status", { method: "POST" })
+    const result = await response.json().catch(() => null)
+    setCheckingStatus(false)
+
+    if (response.ok && result?.status) {
+      setStatus(result.status)
+    }
+  }
+
+  useEffect(() => {
+    if (status === "pending" || status === "under_review") {
+      checkStatus()
+    }
+    // Only check once on mount for the initial status — the "Refresh status"
+    // button covers manual re-checks after that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -79,7 +101,7 @@ export function PayoutAccountForm({ user, payoutAccount, className, ...props }) 
       return
     }
 
-    setStatus("active")
+    setStatus("pending")
     setSuccess(true)
   }
 
@@ -92,9 +114,23 @@ export function PayoutAccountForm({ user, payoutAccount, className, ...props }) 
           Razorpay to verify and set up your linked account.
         </CardDescription>
         {status && (
-          <Badge variant={status === "active" ? "default" : "outline"} className="w-fit">
-            {STATUS_LABEL[status] ?? status}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={status === "active" ? "default" : "outline"} className="w-fit">
+              {STATUS_LABEL[status] ?? status}
+            </Badge>
+            {(status === "pending" || status === "under_review") && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={checkStatus}
+                disabled={checkingStatus}
+              >
+                {checkingStatus && <Spinner />}
+                Refresh status
+              </Button>
+            )}
+          </div>
         )}
       </CardHeader>
       <form onSubmit={handleSubmit}>

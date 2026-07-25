@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdminBrandsTable } from "@/components/admin-brands-table";
 import { AdminCampaignsTable } from "@/components/admin-campaigns-table";
 import { AdminClippersTable } from "@/components/admin-clippers-table";
+import { AdminPayoutsTable } from "@/components/admin-payouts-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function AdminPage() {
@@ -26,6 +27,7 @@ export default async function AdminPage() {
     { data: stats },
     { data: campaigns },
     { data: applications },
+    { data: payouts },
   ] = await Promise.all([
     admin.auth.admin.listUsers({ perPage: 1000 }),
     admin.from("profiles").select("id, full_name, role"),
@@ -33,6 +35,9 @@ export default async function AdminPage() {
     admin.from("youtube_channel_stats_daily").select("user_id, views"),
     admin.from("campaigns").select("id, title, status, payout_structure, payout_rate, brand_id"),
     admin.from("campaign_applications").select("id, campaign_id"),
+    admin
+      .from("campaign_payouts")
+      .select("id, application_id, clipper_id, amount, status, held_at, released_at, created_at"),
   ]);
 
   const emailById = Object.fromEntries(
@@ -78,6 +83,20 @@ export default async function AdminPage() {
     applicant_count: applicationCountByCampaign[c.id] ?? 0,
   }));
 
+  const campaignById = Object.fromEntries((campaigns ?? []).map((c) => [c.id, c]));
+  const applicationById = Object.fromEntries((applications ?? []).map((a) => [a.id, a]));
+
+  const payoutsWithDetail = (payouts ?? []).map((p) => {
+    const application = applicationById[p.application_id];
+    const campaign = application ? campaignById[application.campaign_id] : undefined;
+    return {
+      ...p,
+      clipper_name: profileById[p.clipper_id]?.full_name,
+      clipper_email: emailById[p.clipper_id],
+      campaign_title: campaign?.title,
+    };
+  });
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
@@ -103,9 +122,7 @@ export default async function AdminPage() {
           <AdminCampaignsTable campaigns={campaignsWithDetail} />
         </TabsContent>
         <TabsContent value="payments" className="mt-4">
-          <p className="text-sm text-muted-foreground">
-            No payment data exists yet — payouts aren&apos;t implemented.
-          </p>
+          <AdminPayoutsTable payouts={payoutsWithDetail} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,6 +1,8 @@
 import { AnalyticsChart } from "@/components/analytics-chart"
 import { DashboardSummaryCards } from "@/components/dashboard-summary-cards"
 import { MyApplicationsTable } from "@/components/my-applications-table"
+import { isSuperAdmin } from "@/lib/admin"
+import { requireRole } from "@/lib/roles"
 import { createClient } from "@/lib/supabase/server"
 
 export default async function Page() {
@@ -8,6 +10,10 @@ export default async function Page() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  if (!isSuperAdmin(user)) {
+    await requireRole(supabase, user, "clipper", "/campaigns")
+  }
 
   const { data: stats } = await supabase
     .from("youtube_channel_stats_daily")
@@ -35,13 +41,19 @@ export default async function Page() {
   const { data: applications } = await supabase
     .from("campaign_applications")
     .select(
-      "id, status, created_at, campaign:campaigns(title, payout_structure, payout_rate), submission:campaign_submissions(status)"
+      "id, status, created_at, campaign:campaigns(title, payout_structure, payout_rate), submission:campaign_submissions(status, created_at), payout:campaign_payouts(amount, status, held_at, released_at)"
     )
     .eq("clipper_id", user.id)
     .order("created_at", { ascending: false })
 
   const statsRows = stats ?? []
   const totalViews = statsRows.reduce((sum, row) => sum + (row.views ?? 0), 0)
+
+  const applicationsWithLatestSubmission = (applications ?? []).map((application) => ({
+    ...application,
+    submission: (application.submission ?? [])
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0],
+  }))
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
@@ -60,7 +72,7 @@ export default async function Page() {
             dataKey="views"
           />
         </div>
-        <MyApplicationsTable applications={applications ?? []} />
+        <MyApplicationsTable applications={applicationsWithLatestSubmission} />
       </div>
     </div>
   );

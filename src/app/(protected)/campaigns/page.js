@@ -57,6 +57,7 @@ export default async function CampaignsPage() {
     .from("campaigns")
     .select("*")
     .eq("status", "active")
+    .eq("funding_status", "paid")
     .order("created_at", { ascending: false });
 
   const { data: applications } = await supabase

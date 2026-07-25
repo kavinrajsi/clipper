@@ -21,6 +21,20 @@ const SUBMISSION_STATUS_VARIANT = {
   rejected: "destructive",
 }
 
+const PAYOUT_STATUS_VARIANT = {
+  pending: "secondary",
+  held: "secondary",
+  released: "default",
+  failed: "destructive",
+}
+
+const PAYOUT_STATUS_LABEL = {
+  pending: "Pending",
+  held: "Approved — pending release",
+  released: "Released",
+  failed: "Failed",
+}
+
 function formatRate(campaign) {
   const amount = new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -40,13 +54,14 @@ export function MyApplicationsTable({ applications }) {
               <TableHead>Payout</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Submission</TableHead>
+              <TableHead>Payout status</TableHead>
               <TableHead className="text-right">Applied</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {applications.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   You haven&apos;t applied to any campaigns yet.
                 </TableCell>
               </TableRow>
@@ -64,15 +79,29 @@ export function MyApplicationsTable({ applications }) {
                   </TableCell>
                   <TableCell>
                     {application.submission ? (
-                      <Badge
-                        variant={
-                          SUBMISSION_STATUS_VARIANT[application.submission.status] ?? "outline"
-                        }
-                      >
-                        {application.submission.status}
-                      </Badge>
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge
+                          variant={
+                            SUBMISSION_STATUS_VARIANT[application.submission.status] ?? "outline"
+                          }
+                        >
+                          {application.submission.status}
+                        </Badge>
+                        {application.submission.status === "rejected" && (
+                          <SubmissionForm applicationId={application.id} />
+                        )}
+                      </div>
                     ) : application.status === "approved" ? (
                       <SubmissionForm applicationId={application.id} />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {application.payout ? (
+                      <Badge variant={PAYOUT_STATUS_VARIANT[application.payout.status] ?? "outline"}>
+                        {PAYOUT_STATUS_LABEL[application.payout.status] ?? application.payout.status}
+                      </Badge>
                     ) : (
                       <span className="text-sm text-muted-foreground">—</span>
                     )}

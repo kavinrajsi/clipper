@@ -42,7 +42,7 @@ export async function POST(request) {
   };
 
   try {
-    const account = await createLinkedAccount({
+    const { account, productId } = await createLinkedAccount({
       email: user.email,
       contactName,
       phone,
@@ -52,12 +52,15 @@ export async function POST(request) {
       addressCity,
       addressState,
       addressPostalCode,
+      bankAccountNumber,
+      bankIfsc,
     });
 
     const { error: upsertError } = await supabase.from("clipper_payout_accounts").upsert({
       ...baseRow,
       razorpay_account_id: account.id,
-      status: "active",
+      razorpay_product_id: productId,
+      status: "pending",
     });
 
     if (upsertError) throw upsertError;

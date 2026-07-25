@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { isSuperAdmin } from "@/lib/admin";
+import { requireRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { YoutubeConnectorCard } from "@/components/youtube-connector-card";
 
@@ -10,6 +12,10 @@ export default async function ConnectorsPage() {
 
   if (!user) {
     redirect("/login?next=/connectors");
+  }
+
+  if (!isSuperAdmin(user)) {
+    await requireRole(supabase, user, "clipper", "/campaigns");
   }
 
   const { data: connection } = await supabase

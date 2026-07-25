@@ -27,7 +27,7 @@ export default async function ClipperProfilePage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
+      <div className="mx-auto w-full max-w-3xl">
         <h1 className="text-2xl font-bold">Clipper Profile</h1>
         <p className="text-sm text-muted-foreground">
           Details brands see when evaluating you for a campaign. By completing this profile,
@@ -38,9 +38,11 @@ export default async function ClipperProfilePage() {
           .
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ClipperProfileForm userId={user.id} clipperProfile={clipperProfile} />
-      </div>
+      <ClipperProfileForm
+        userId={user.id}
+        clipperProfile={clipperProfile}
+        className="mx-auto w-full max-w-3xl"
+      />
     </div>
   );
 }

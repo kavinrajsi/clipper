@@ -26,15 +26,18 @@ export default async function PayoutAccountPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
+      <div className="mx-auto w-full max-w-3xl">
         <h1 className="text-2xl font-bold">Payout Account</h1>
         <p className="text-sm text-muted-foreground">
-          Set up how you get paid for approved campaigns.
+          Required before you can receive campaign payouts. Bank details and PAN are sent to
+          Razorpay to verify and set up your linked account.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <PayoutAccountForm user={user} payoutAccount={payoutAccount} />
-      </div>
+      <PayoutAccountForm
+        user={user}
+        payoutAccount={payoutAccount}
+        className="mx-auto w-full max-w-3xl"
+      />
     </div>
   );
 }

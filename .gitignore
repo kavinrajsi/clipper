@@ -42,3 +42,8 @@ next-env.d.ts
 
 # local docs
 /docs
+
+# supabase (CLI local dev — migrations/config ARE committed, only local state is ignored)
+/supabase/.branches
+/supabase/.temp
+/supabase/.env

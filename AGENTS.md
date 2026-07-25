@@ -63,6 +63,21 @@ Flow: brand creates a campaign → funds the full budget via Razorpay Checkout (
 - Per-view payouts depend on the clipper having synced the submitted video via Connectors — if it's not in `youtube_videos`, the payout falls back to a submission-time snapshot (`view_count_at_submission`), which may be `null` if that wasn't captured either.
 - Brand-only pages aren't route-gated by role (see "Auth and roles" above).
 
-## No local migration history
+## No local migration history (yet)
 
-**`supabase/migrations/` does not exist in this repo** — every migration built for this project was created and later removed from disk outside of git's tracking (not gitignored, never committed). The live Supabase project (ref in `NEXT_PUBLIC_SUPABASE_URL`) is the **only** source of truth for the schema. Don't assume migration files exist, don't try to diff against them, and check the live project directly (Supabase MCP tools — `list_tables`, `execute_sql` — or the dashboard) before making schema changes. If you need migration history back, `supabase db pull` against the live project (once the CLI is authenticated) would reconstruct it from the current schema, but that hasn't been done.
+**`supabase/` does not exist in this repo as of this writing** — every migration built for this project was created and later removed from disk outside of git's tracking (not gitignored, never committed). The live Supabase project (ref `nfeuykwnqqtdecwucujo`, from `NEXT_PUBLIC_SUPABASE_URL`) is the **only** source of truth for the schema until someone runs the local setup below. Don't assume migration files exist, don't try to diff against them, and check the live project directly (Supabase MCP tools — `list_tables`, `execute_sql` — or the dashboard) before making schema changes, unless you've just confirmed `supabase/migrations/` exists on disk.
+
+To set up local dev and reconstruct migration history (needs a container runtime — OrbStack or Docker Desktop):
+
+```bash
+brew install --cask orbstack
+supabase login
+supabase init
+supabase link --project-ref nfeuykwnqqtdecwucujo
+supabase db pull      # writes supabase/migrations/ from the live schema
+supabase start        # local Postgres/Auth/Storage/Studio, separate from prod data
+```
+
+Once `supabase/` exists: **commit** `supabase/migrations/` and `supabase/config.toml`; `.gitignore` already excludes the CLI's local-only state (`supabase/.branches`, `supabase/.temp`, `supabase/.env`). New schema changes should then go through `supabase migration new <name>` + `supabase db push`/`db pull` rather than only against the live project directly — update this section once that's actually the workflow in use, since right now it isn't.
+
+Local Supabase also needs its own Google OAuth redirect URI (`http://127.0.0.1:54321/auth/v1/callback`) registered in the Google Cloud console alongside the prod one — the YouTube connector's OAuth client is separate from Supabase's, see "Auth and roles" above.

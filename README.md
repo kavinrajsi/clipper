@@ -47,7 +47,20 @@ SUPER_ADMIN_EMAIL=
 
 ### Database
 
-**There is no local migration history** (`supabase/migrations/` doesn't exist in this repo — see `AGENTS.md`). The schema lives only in the live Supabase project. To make schema changes, run SQL directly against that project (SQL Editor, or Supabase MCP tools if connected) rather than expecting a `supabase migration` workflow to already be set up.
+**There is no local migration history yet** — `supabase/` doesn't exist in this repo (see `AGENTS.md`). The schema lives only in the live Supabase project (ref `nfeuykwnqqtdecwucujo`). Until `supabase/` is set up, make schema changes by running SQL directly against that project (SQL Editor, or Supabase MCP tools if connected).
+
+To set up local dev / reconstruct migration history:
+
+```bash
+brew install --cask orbstack   # or Docker Desktop — local stack needs a container runtime
+supabase login
+supabase init
+supabase link --project-ref nfeuykwnqqtdecwucujo
+supabase db pull                # pulls remote schema down as migrations/
+supabase start                  # local Postgres/Auth/Storage/Studio
+```
+
+`supabase start` prints a local API URL + anon/service_role keys — use those in a separate env file for local dev instead of the prod values in `.env.local`. `supabase/migrations/` and `supabase/config.toml` should be committed once created; `.gitignore` already excludes the CLI's local-only state (`.branches`, `.temp`, `.env`).
 
 ## Route map
 

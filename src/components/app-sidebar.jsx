@@ -5,6 +5,7 @@ import Link from "next/link"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { Logo } from "@/components/logo"
 import {
   Sidebar,
   SidebarContent,
@@ -24,7 +25,6 @@ import {
   Building2Icon,
   UsersIcon,
   ShieldIcon,
-  CommandIcon,
 } from "lucide-react"
 
 const clipperNavMain = [
@@ -94,7 +94,7 @@ export function AppSidebar({ user, profile, isAdmin, ...props }) {
             <SidebarMenuButton
               className="data-[slot=sidebar-menu-button]:p-1.5!"
               render={<Link href={homeUrl} />}>
-              <CommandIcon className="size-5!" />
+              <Logo className="size-5!" />
               <span className="text-base font-semibold">Clipper</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

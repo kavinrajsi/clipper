@@ -25,6 +25,8 @@ export default async function AdminPage() {
     { data: profiles },
     { data: connections },
     { data: stats },
+    { data: clipperProfiles },
+    { data: brandProfiles },
     { data: campaigns },
     { data: applications },
     { data: payouts },
@@ -33,7 +35,17 @@ export default async function AdminPage() {
     admin.from("profiles").select("id, full_name, role"),
     admin.from("youtube_connections").select("user_id, channel_title, last_synced_at"),
     admin.from("youtube_channel_stats_daily").select("user_id, views"),
-    admin.from("campaigns").select("id, title, status, payout_structure, payout_rate, brand_id"),
+    admin
+      .from("clipper_profiles")
+      .select("user_id, bio, categories, style_tags, pricing_model, rate_amount, availability_status"),
+    admin
+      .from("brand_profiles")
+      .select("user_id, website, industry, description, logo_url, font_name, color_code"),
+    admin
+      .from("campaigns")
+      .select(
+        "id, title, description, requirements, status, payout_structure, payout_rate, budget, deadline, funding_status, created_at, brand_id"
+      ),
     admin.from("campaign_applications").select("id, campaign_id"),
     admin
       .from("campaign_payouts")
@@ -46,6 +58,12 @@ export default async function AdminPage() {
   const profileById = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
   const connectionByUser = Object.fromEntries(
     (connections ?? []).map((c) => [c.user_id, c])
+  );
+  const clipperProfileByUser = Object.fromEntries(
+    (clipperProfiles ?? []).map((c) => [c.user_id, c])
+  );
+  const brandProfileByUser = Object.fromEntries(
+    (brandProfiles ?? []).map((b) => [b.user_id, b])
   );
   const viewsByUser = (stats ?? []).reduce((acc, row) => {
     acc[row.user_id] = (acc[row.user_id] ?? 0) + (row.views ?? 0);
@@ -65,6 +83,12 @@ export default async function AdminPage() {
       channel_title: connectionByUser[p.id]?.channel_title,
       last_synced_at: connectionByUser[p.id]?.last_synced_at,
       total_views: viewsByUser[p.id] ?? 0,
+      bio: clipperProfileByUser[p.id]?.bio,
+      categories: clipperProfileByUser[p.id]?.categories ?? [],
+      style_tags: clipperProfileByUser[p.id]?.style_tags ?? [],
+      pricing_model: clipperProfileByUser[p.id]?.pricing_model,
+      rate_amount: clipperProfileByUser[p.id]?.rate_amount,
+      availability_status: clipperProfileByUser[p.id]?.availability_status,
     }));
 
   const brands = (profiles ?? [])
@@ -74,6 +98,12 @@ export default async function AdminPage() {
       full_name: p.full_name,
       email: emailById[p.id],
       campaign_count: (campaigns ?? []).filter((c) => c.brand_id === p.id).length,
+      website: brandProfileByUser[p.id]?.website,
+      industry: brandProfileByUser[p.id]?.industry,
+      description: brandProfileByUser[p.id]?.description,
+      logo_url: brandProfileByUser[p.id]?.logo_url,
+      font_name: brandProfileByUser[p.id]?.font_name,
+      color_code: brandProfileByUser[p.id]?.color_code,
     }));
 
   const campaignsWithDetail = (campaigns ?? []).map((c) => ({

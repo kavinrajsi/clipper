@@ -48,7 +48,8 @@ export default async function CampaignDetailPage({ params }) {
     const { data: submissionsData } = await supabase
       .from("campaign_submissions")
       .select("*")
-      .in("application_id", applicationIds);
+      .in("application_id", applicationIds)
+      .order("created_at", { ascending: true });
     submissions = submissionsData ?? [];
 
     const { data: payoutsData } = await supabase

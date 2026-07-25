@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { CommandIcon } from "lucide-react"
+import { Logo } from "@/components/logo"
 import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { UserMenu } from "@/components/user-menu"
@@ -23,7 +23,7 @@ export async function Header() {
   return (
     <header className="flex items-center justify-between border-b px-6 py-4">
       <Link href="/" className="flex items-center gap-2 font-semibold">
-        <CommandIcon className="size-5" />
+        <Logo className="size-5" />
         Clipper
       </Link>
       {user ? (

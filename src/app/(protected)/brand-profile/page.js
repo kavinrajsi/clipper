@@ -20,15 +20,17 @@ export default async function BrandProfilePage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
+      <div className="mx-auto w-full max-w-3xl">
         <h1 className="text-2xl font-bold">Brand Profile</h1>
         <p className="text-sm text-muted-foreground">
           Details clippers see when browsing your campaigns.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <BrandProfileForm userId={user.id} brandProfile={brandProfile} />
-      </div>
+      <BrandProfileForm
+        userId={user.id}
+        brandProfile={brandProfile}
+        className="mx-auto w-full max-w-3xl"
+      />
     </div>
   );
 }

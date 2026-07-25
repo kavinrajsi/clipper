@@ -7,14 +7,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,6 +24,8 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
   const [website, setWebsite] = useState(brandProfile?.website ?? "")
   const [industry, setIndustry] = useState(brandProfile?.industry ?? "")
   const [description, setDescription] = useState(brandProfile?.description ?? "")
+  const [fontName, setFontName] = useState(brandProfile?.font_name ?? "")
+  const [colorCode, setColorCode] = useState(brandProfile?.color_code ?? "")
   const [logoUrl, setLogoUrl] = useState(brandProfile?.logo_url ?? null)
   const [logoPreview, setLogoPreview] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
@@ -73,6 +74,8 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
       website: website || null,
       industry: industry || null,
       description: description || null,
+      font_name: fontName || null,
+      color_code: colorCode || null,
       logo_url: nextLogoUrl,
       updated_at: new Date().toISOString(),
     })
@@ -91,87 +94,125 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
   }
 
   return (
-    <Card className={cn(className)} {...props}>
-      <CardHeader>
-        <CardTitle>Brand Profile</CardTitle>
-        <CardDescription>What clippers see when evaluating your campaigns</CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent>
-          <FieldGroup>
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            {success && (
-              <Alert>
-                <AlertDescription>Brand profile saved.</AlertDescription>
-              </Alert>
-            )}
+    <form onSubmit={handleSubmit} className={cn(className)} {...props}>
+      <FieldGroup>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {success && (
+          <Alert>
+            <AlertDescription>Brand profile saved.</AlertDescription>
+          </Alert>
+        )}
+
+        <FieldSet>
+          <FieldLegend>Branding</FieldLegend>
+          <Field>
+            <div className="flex items-center gap-4">
+              <Avatar className="size-16">
+                <AvatarImage src={logoPreview ?? logoUrl ?? undefined} alt={companyName} />
+                <AvatarFallback>{companyName?.[0]?.toUpperCase() ?? "B"}</AvatarFallback>
+              </Avatar>
+              <Input
+                id="logo"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="max-w-56"
+              />
+            </div>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="company-name">Company name</FieldLabel>
+            <Input
+              id="company-name"
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+              required
+            />
+          </Field>
+        </FieldSet>
+
+        <FieldSeparator />
+
+        <FieldSet>
+          <FieldLegend>Brand style</FieldLegend>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field>
-              <div className="flex items-center gap-4">
-                <Avatar className="size-16">
-                  <AvatarImage src={logoPreview ?? logoUrl ?? undefined} alt={companyName} />
-                  <AvatarFallback>{companyName?.[0]?.toUpperCase() ?? "B"}</AvatarFallback>
-                </Avatar>
+              <FieldLabel htmlFor="font-name">Font name</FieldLabel>
+              <Input
+                id="font-name"
+                placeholder="e.g. Inter"
+                value={fontName}
+                onChange={(event) => setFontName(event.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="color-code">Color code</FieldLabel>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  aria-label="Pick brand color"
+                  value={/^#[0-9a-fA-F]{6}$/.test(colorCode) ? colorCode : "#000000"}
+                  onChange={(event) => setColorCode(event.target.value)}
+                  className="h-9 w-9 shrink-0 cursor-pointer rounded-md border bg-transparent p-1"
+                />
                 <Input
-                  id="logo"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="max-w-56"
+                  id="color-code"
+                  placeholder="#7C3AED"
+                  value={colorCode}
+                  onChange={(event) => setColorCode(event.target.value)}
                 />
               </div>
             </Field>
+          </div>
+        </FieldSet>
+
+        <FieldSeparator />
+
+        <FieldSet>
+          <FieldLegend>About</FieldLegend>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor="company-name">Company name</FieldLabel>
+              <FieldLabel htmlFor="website">Website</FieldLabel>
               <Input
-                id="company-name"
-                value={companyName}
-                onChange={(event) => setCompanyName(event.target.value)}
-                required
+                id="website"
+                type="url"
+                placeholder="https://example.com"
+                value={website}
+                onChange={(event) => setWebsite(event.target.value)}
               />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field>
-                <FieldLabel htmlFor="website">Website</FieldLabel>
-                <Input
-                  id="website"
-                  type="url"
-                  placeholder="https://example.com"
-                  value={website}
-                  onChange={(event) => setWebsite(event.target.value)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="industry">Industry</FieldLabel>
-                <Input
-                  id="industry"
-                  value={industry}
-                  onChange={(event) => setIndustry(event.target.value)}
-                />
-              </Field>
-            </div>
             <Field>
-              <FieldLabel htmlFor="description">Description</FieldLabel>
-              <Textarea
-                id="description"
-                placeholder="Tell clippers what your company does"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={4}
+              <FieldLabel htmlFor="industry">Industry</FieldLabel>
+              <Input
+                id="industry"
+                value={industry}
+                onChange={(event) => setIndustry(event.target.value)}
               />
             </Field>
-          </FieldGroup>
-        </CardContent>
-        <CardFooter>
-          <Button type="submit" disabled={loading}>
-            {loading && <Spinner />}
-            Save changes
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
+          </div>
+          <Field>
+            <FieldLabel htmlFor="description">Description</FieldLabel>
+            <Textarea
+              id="description"
+              placeholder="Tell clippers what your company does"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={6}
+            />
+          </Field>
+        </FieldSet>
+      </FieldGroup>
+
+      <div className="mt-6 flex justify-end border-t pt-6">
+        <Button type="submit" disabled={loading}>
+          {loading && <Spinner />}
+          Save changes
+        </Button>
+      </div>
+    </form>
   );
 }

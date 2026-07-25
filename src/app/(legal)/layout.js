@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { CommandIcon } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 export default function LegalLayout({ children }) {
   return (
     <div className="flex min-h-svh flex-col">
       <header className="border-b px-6 py-4">
         <Link href="/" className="flex items-center gap-2 font-semibold">
-          <CommandIcon className="size-5" />
+          <Logo className="size-5" />
           Clipper
         </Link>
       </header>

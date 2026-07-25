@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { isSuperAdmin } from "@/lib/admin";
+import { requireRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { ActivityFeed } from "@/components/activity-feed";
 import { AnalyticsChart } from "@/components/analytics-chart";
@@ -13,6 +15,10 @@ export default async function AnalyticsPage() {
 
   if (!user) {
     redirect("/login?next=/analytics");
+  }
+
+  if (!isSuperAdmin(user)) {
+    await requireRole(supabase, user, "clipper", "/campaigns");
   }
 
   const { data: stats } = await supabase

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { isSuperAdmin } from "@/lib/admin";
+import { requireRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { ClipperProfileForm } from "@/components/clipper-profile-form";
 
@@ -11,6 +13,10 @@ export default async function ClipperProfilePage() {
 
   if (!user) {
     redirect("/login?next=/clipper-profile");
+  }
+
+  if (!isSuperAdmin(user)) {
+    await requireRole(supabase, user, "clipper", "/campaigns");
   }
 
   const { data: clipperProfile } = await supabase

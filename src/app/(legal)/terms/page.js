@@ -45,10 +45,11 @@ export default function TermsPage() {
 
       <h2 className="mt-8 text-lg font-semibold">4. Payments</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        <strong>Not yet implemented.</strong> This platform does not currently process or
-        move real payments. Campaign budgets and payout rates shown in the product are
-        informational until a payment processor (e.g. Stripe Connect) is integrated. This
-        section will be replaced with real payment terms before any money changes hands.
+        Brands fund a campaign's budget through Razorpay before it goes active. When a brand
+        approves a clipper's submission, the payout amount is transferred to Razorpay on hold;
+        the brand releases the hold to complete payment to the clipper's connected payout
+        account. Clippers must complete payout account verification before funds can be
+        released to them.
       </p>
 
       <h2 className="mt-8 text-lg font-semibold">5. Intellectual Property</h2>

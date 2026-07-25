@@ -24,7 +24,7 @@ const FAQS = [
   {
     question: "When do I get paid?",
     answer:
-      "Payouts aren't live yet. Campaigns show a payout structure and rate for reference, but no real money moves through the platform today. This will change once a payment processor is integrated — see the Terms of Service for the current status.",
+      "Once a brand funds a campaign and approves your submission, we create a held payout in Razorpay for the campaign's rate. The brand releases the hold once everything checks out, and the funds settle to your connected payout account.",
   },
   {
     question: "Why isn't my YouTube data syncing?",
@@ -34,11 +34,11 @@ const FAQS = [
   {
     question: "Can I be both a brand and a clipper?",
     answer:
-      "Not currently. Your role (Brand or Clipper) is chosen at signup and can't be switched from the app.",
+      "You can't act as both at once, but you're not locked into your original choice — switch anytime from Profile.",
   },
   {
     question: "How do I change my role?",
-    answer: "There's no self-serve way to do this yet — contact support and we'll sort it out.",
+    answer: "Go to Profile and use the Clipper/Brand toggle — it's self-serve, no need to contact support.",
   },
   {
     question: "How quickly will I get a response?",

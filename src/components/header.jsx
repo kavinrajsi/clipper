@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { HeaderNav } from "@/components/header-nav"
 import { Logo } from "@/components/logo"
 import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
@@ -21,28 +22,29 @@ export async function Header() {
   }
 
   return (
-    <header className="flex items-center justify-between border-b px-6 py-4">
-      <div className="flex items-center gap-6">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
+    // Rule spans the viewport; the contents sit in the same max-w-4xl column as
+    // every page body and the footer. Three tracks so the nav is centred on that
+    // column, not on whatever space the wordmark and account control leave.
+    <header className="border-b px-6">
+      <div className="mx-auto grid w-full max-w-4xl grid-cols-[1fr_auto_1fr] items-center gap-4 py-4">
+        <Link
+          href="/"
+          className="flex items-center gap-2 justify-self-start rounded-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+        >
           <Logo className="size-5" />
           Clipper
         </Link>
-        <Link
-          href="/discover"
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          Find creators
-        </Link>
-      </div>
-      {user ? (
-        <UserMenu user={user} profile={profile} />
-      ) : (
-        <div className="flex items-center gap-2">
-          <Button nativeButton={false} render={<Link href="/login" />}>
-            Sign in
-          </Button>
+        <HeaderNav />
+        <div className="justify-self-end">
+          {user ? (
+            <UserMenu user={user} profile={profile} />
+          ) : (
+            <Button nativeButton={false} render={<Link href="/login" />}>
+              Sign in
+            </Button>
+          )}
         </div>
-      )}
+      </div>
     </header>
   );
 }

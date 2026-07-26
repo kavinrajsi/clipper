@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Footer } from "@/components/footer";
 import { Logo } from "@/components/logo";
 
 export default function LegalLayout({ children }) {
@@ -11,6 +12,7 @@ export default function LegalLayout({ children }) {
         </Link>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">{children}</main>
+      <Footer />
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import Link from "next/link";
 import {
   ChevronRightIcon,
@@ -106,7 +105,7 @@ export default function Home() {
               {formatNumber(128402)} views
             </p>
             <p className="mt-1 font-mono text-xs text-muted-foreground">
-              {formatCampaignRate({ payout_structure: "cpm", payout_rate: 520 })}
+              {formatCampaignRate({ payout_structure: "per_view", payout_rate: 520 })}
             </p>
           </div>
         </div>
@@ -121,28 +120,27 @@ export default function Home() {
           <h2 className="mt-2 text-2xl font-semibold tracking-tight">
             From raw footage to a paid view
           </h2>
-          <div className="mt-8 flex flex-col gap-8 sm:flex-row sm:items-start sm:gap-1">
-            {PROCESS_STEPS.map(([n, Icon, title, body], i) => (
-              <Fragment key={n}>
-                <div className="flex flex-1 flex-col gap-3">
+          {/* Three across, so five steps land 3 + 2. The step number carries
+              the order — a wrapped row can't, which is why the chevrons went. */}
+          <ol className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {PROCESS_STEPS.map(([n, Icon, title, body]) => (
+              <li
+                key={n}
+                className="flex flex-col gap-3 rounded-lg border border-border p-5"
+              >
+                <div className="flex items-center justify-between">
                   <div className="flex size-10 items-center justify-center rounded-lg border border-border">
                     <Icon className="size-5 text-muted-foreground" />
                   </div>
-                  <div>
-                    <span className="font-mono text-xs text-muted-foreground">{n}</span>
-                    <p className="mt-1 font-medium">{title}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{body}</p>
-                  </div>
+                  <span className="font-mono text-xs text-muted-foreground">{n}</span>
                 </div>
-                {i < PROCESS_STEPS.length - 1 && (
-                  <ChevronRightIcon
-                    className="hidden size-4 shrink-0 self-center text-muted-foreground/30 sm:block"
-                    aria-hidden="true"
-                  />
-                )}
-              </Fragment>
+                <div>
+                  <p className="font-medium">{title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+                </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
@@ -205,8 +203,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Verification / trust */}
-      <section className="border-b border-border px-6 py-16">
+      {/* Verification / trust — last section, so no border-b: the footer's
+          closing-bracket rule is the divider. */}
+      <section className="px-6 py-16">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Channel verification
@@ -228,17 +227,6 @@ export default function Home() {
                 channel bio and confirm ownership that way instead.
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Closing CTA */}
-      <section className="px-6 py-16">
-        <div className="mx-auto flex max-w-4xl flex-col items-start gap-4">
-          <div className="flex gap-4 font-mono text-xs text-muted-foreground">
-            <Link href="/terms" className="hover:text-foreground">Terms</Link>
-            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            <Link href="/clipper-terms" className="hover:text-foreground">Clipper terms</Link>
           </div>
         </div>
       </section>

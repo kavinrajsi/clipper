@@ -28,7 +28,7 @@ const SPEC_ROWS = [
   },
   {
     key: "payout_rate",
-    value: formatCampaignRate({ payout_structure: "cpm", payout_rate: 520 }),
+    value: formatCampaignRate({ payout_structure: "per_view", payout_rate: 520 }),
     note: "Computed from view counts synced off the YouTube Data API.",
   },
   {
@@ -89,7 +89,7 @@ export default function ForBrandsPage() {
             The campaign spec
           </span>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-            Seven fields, then it&apos;s live
+            Seven fields, then you fund it
           </h2>
           <p className="mt-2 max-w-xl text-muted-foreground">
             This is the whole form. Nothing is negotiated in a thread afterwards

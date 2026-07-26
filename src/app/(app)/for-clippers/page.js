@@ -74,7 +74,7 @@ export default function ForClippersPage() {
               <p className="mt-2 font-medium">A rate per 1,000 views</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Counted from your channel&apos;s synced YouTube data. At{" "}
-                {formatCampaignRate({ payout_structure: "cpm", payout_rate: EXAMPLE.rate })},
+                {formatCampaignRate({ payout_structure: "per_view", payout_rate: EXAMPLE.rate })},
                 a clip that does {formatNumber(EXAMPLE.views)} views pays{" "}
                 <span className="text-foreground">{formatCurrency(grossPayout)}</span>.
               </p>

@@ -67,6 +67,22 @@ async function getCreators(searchParams) {
     supabase.from("creator_stats").select("*").in("user_id", userIds),
   ]);
 
+  // Which of these the viewer has already saved. RLS scopes saved_creators to
+  // the caller, so an anonymous visitor simply gets nothing back.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let savedIds = new Set();
+  if (user) {
+    const { data: saves } = await supabase
+      .from("saved_creators")
+      .select("creator_id")
+      .eq("user_id", user.id)
+      .in("creator_id", userIds);
+    savedIds = new Set((saves ?? []).map((s) => s.creator_id));
+  }
+
   const accountById = Object.fromEntries((accounts ?? []).map((a) => [a.id, a]));
   const verificationById = Object.fromEntries((verifications ?? []).map((v) => [v.user_id, v]));
   const statsById = Object.fromEntries((stats ?? []).map((s) => [s.user_id, s]));
@@ -76,6 +92,9 @@ async function getCreators(searchParams) {
     account: accountById[profile.user_id],
     verification: verificationById[profile.user_id],
     stats: statsById[profile.user_id],
+    saved: savedIds.has(profile.user_id),
+    isAuthenticated: Boolean(user),
+    isSelf: user?.id === profile.user_id,
   }));
 
   // creator_stats is a view with no FK to clipper_profiles, so PostgREST can't
@@ -128,13 +147,17 @@ async function Results({ searchParams }) {
         {creators.length === PAGE_SIZE ? " (showing the first page)" : ""}
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        {creators.map(({ profile, account, verification, stats }) => (
+        {creators.map(({ profile, account, verification, stats, saved, isAuthenticated, isSelf }) => (
           <ClipperDirectoryCard
             key={profile.user_id}
             clipperProfile={profile}
             profile={account}
             verification={verification}
             stats={stats}
+            saved={saved}
+            isAuthenticated={isAuthenticated}
+            // No point offering to bookmark yourself.
+            showSave={!isSelf}
           />
         ))}
       </div>

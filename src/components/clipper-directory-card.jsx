@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { SaveButton } from "@/components/save-button"
 import { VerifiedBadge } from "@/components/verified-badge"
 import { formatClipperRate, formatNumber } from "@/lib/format"
 
@@ -16,9 +17,17 @@ function getInitials(name) {
 }
 
 // Used by both /clippers (brand-only, shows every profile) and /discover
-// (public, published profiles only). `verification` and `stats` are optional —
-// /clippers doesn't fetch them.
-export function ClipperDirectoryCard({ clipperProfile, profile, verification, stats }) {
+// (public, published profiles only). `verification`, `stats` and the save props
+// are optional — /clippers doesn't fetch them.
+export function ClipperDirectoryCard({
+  clipperProfile,
+  profile,
+  verification,
+  stats,
+  saved,
+  isAuthenticated,
+  showSave = false,
+}) {
   const rate = formatClipperRate(clipperProfile)
   const name = profile?.full_name ?? "Unnamed clipper"
   const href = clipperProfile.is_public && clipperProfile.handle
@@ -53,6 +62,16 @@ export function ClipperDirectoryCard({ clipperProfile, profile, verification, st
               </Badge>
             )}
           </div>
+          {showSave && (
+            <SaveButton
+              type="creator"
+              targetId={clipperProfile.user_id}
+              initialSaved={saved}
+              isAuthenticated={isAuthenticated}
+              signInHref={`/login?next=${encodeURIComponent(href ?? "/discover")}`}
+              className="ml-auto shrink-0"
+            />
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

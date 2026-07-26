@@ -26,6 +26,7 @@ import {
   Building2Icon,
   UsersIcon,
   ShieldIcon,
+  BookmarkIcon,
 } from "lucide-react"
 
 const clipperNavMain = [
@@ -55,6 +56,11 @@ const clipperNavMain = [
     icon: <MegaphoneIcon />,
   },
   {
+    title: "Saved",
+    url: "/saved",
+    icon: <BookmarkIcon />,
+  },
+  {
     title: "Payout Account",
     url: "/payout-account",
     icon: <WalletIcon />,
@@ -71,6 +77,11 @@ const brandNavMain = [
     title: "Clippers",
     url: "/clippers",
     icon: <UsersIcon />,
+  },
+  {
+    title: "Saved",
+    url: "/saved",
+    icon: <BookmarkIcon />,
   },
   {
     title: "Brand Profile",

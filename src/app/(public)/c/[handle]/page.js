@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatClipperRate, formatDate, formatNumber } from "@/lib/format";
+import { SaveButton } from "@/components/save-button";
 import { VerifiedBadge } from "@/components/verified-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +53,30 @@ async function getProfile(handle) {
         .order("position", { ascending: true }),
     ]);
 
-  return { profile, account, verification, stats, portfolio: portfolio ?? [] };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let saved = false;
+  if (user && user.id !== profile.user_id) {
+    const { data } = await supabase
+      .from("saved_creators")
+      .select("creator_id")
+      .eq("user_id", user.id)
+      .eq("creator_id", profile.user_id)
+      .maybeSingle();
+    saved = Boolean(data);
+  }
+
+  return {
+    profile,
+    account,
+    verification,
+    stats,
+    portfolio: portfolio ?? [],
+    saved,
+    viewer: user,
+  };
 }
 
 export async function generateMetadata({ params }) {
@@ -79,7 +103,8 @@ export default async function CreatorProfilePage({ params }) {
   // Unpublished and nonexistent both land here by design.
   if (!data) notFound();
 
-  const { profile, account, verification, stats, portfolio } = data;
+  const { profile, account, verification, stats, portfolio, saved, viewer } = data;
+  const isSelf = viewer?.id === profile.user_id;
   const name = account?.full_name ?? `@${profile.handle}`;
   const rate = formatClipperRate(profile);
   const availability = AVAILABILITY[profile.availability_status];
@@ -115,9 +140,22 @@ export default async function CreatorProfilePage({ params }) {
             </div>
           </div>
 
-          <Button nativeButton={false} render={<Link href="/campaigns" />}>
-            Invite to campaign
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            {!isSelf && (
+              <SaveButton
+                type="creator"
+                targetId={profile.user_id}
+                initialSaved={saved}
+                isAuthenticated={Boolean(viewer)}
+                signInHref={`/login?next=${encodeURIComponent(`/c/${profile.handle}`)}`}
+                variant="outline"
+                showLabel
+              />
+            )}
+            <Button nativeButton={false} render={<Link href="/campaigns" />}>
+              Invite to campaign
+            </Button>
+          </div>
         </div>
 
         {/* Verified performance is the differentiator — it comes from OAuth-synced

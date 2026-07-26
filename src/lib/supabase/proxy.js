@@ -12,6 +12,7 @@ const PROTECTED_PATH_PREFIXES = [
   "/payout-account",
   "/brand-profile",
   "/clippers",
+  "/saved",
 ];
 
 export async function updateSession(request) {

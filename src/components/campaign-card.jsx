@@ -37,6 +37,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { CampaignForm } from "@/components/campaign-form"
+import { SaveButton } from "@/components/save-button"
 import { openCampaignCheckout } from "@/lib/razorpay-checkout"
 import { formatCampaignRate, formatDate } from "@/lib/format"
 
@@ -61,7 +62,7 @@ const APPLICATION_LABEL = {
 }
 
 
-export function CampaignCard({ campaign, role, applicationStatus }) {
+export function CampaignCard({ campaign, role, applicationStatus, saved = false }) {
   const router = useRouter()
   const supabase = createClient()
   const statusOptions =
@@ -134,10 +135,13 @@ export function CampaignCard({ campaign, role, applicationStatus }) {
       <CardHeader>
         <CardTitle>{campaign.title}</CardTitle>
         <CardDescription>{formatCampaignRate(campaign)}</CardDescription>
-        <CardAction>
+        <CardAction className="flex items-center gap-1">
           <Badge variant={STATUS_VARIANT[campaign.status] ?? "outline"}>
             {campaign.status}
           </Badge>
+          {role === "clipper" && (
+            <SaveButton type="campaign" targetId={campaign.id} initialSaved={saved} />
+          )}
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">

@@ -113,6 +113,7 @@ export default async function CampaignsPage() {
               campaign={campaign}
               role="clipper"
               applicationStatus={applicationByCampaign[campaign.id]}
+              saved={savedCampaignIds.has(campaign.id)}
             />
           ))}
           {(campaigns ?? []).length === 0 && (

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import {
   ActivityIcon,
   HeartIcon,
@@ -28,8 +29,18 @@ export function ActivityFeed({ activities }) {
         <CardDescription>Uploads, likes, comments, and more from your channel</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {/* Inside a card that already has its own title, so no EmptyMedia icon
+            here — the section is labelled, and an icon would just repeat it. */}
         {activities.length === 0 && (
-          <p className="text-sm text-muted-foreground">No activity synced yet.</p>
+          <Empty className="py-6">
+            <EmptyHeader>
+              <EmptyTitle>No activity synced yet</EmptyTitle>
+              <EmptyDescription>
+                Uploads, likes, and comments appear here after you sync your
+                channel from Connectors.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
         {activities.map((activity) => {
           const Icon = TYPE_ICON[activity.type] ?? ActivityIcon

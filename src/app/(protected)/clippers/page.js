@@ -1,8 +1,19 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { UsersRoundIcon } from "lucide-react";
 import { isSuperAdmin } from "@/lib/admin";
 import { requireRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { ClipperDirectoryCard } from "@/components/clipper-directory-card";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 export default async function ClippersPage() {
   const supabase = await createClient();
@@ -44,18 +55,38 @@ export default async function ClippersPage() {
           Browse clipper profiles to find the right fit for your campaign.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {(clipperProfiles ?? []).map((clipperProfile) => (
-          <ClipperDirectoryCard
-            key={clipperProfile.user_id}
-            clipperProfile={clipperProfile}
-            profile={profileById[clipperProfile.user_id]}
-          />
-        ))}
-        {(clipperProfiles ?? []).length === 0 && (
-          <p className="text-sm text-muted-foreground">No clipper profiles yet.</p>
-        )}
-      </div>
+      {/* An empty screen is an invitation to act, so the zero-result state
+          points at /discover — the public directory has creators this
+          brand-scoped list does not. */}
+      {(clipperProfiles ?? []).length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <UsersRoundIcon />
+            </EmptyMedia>
+            <EmptyTitle>No clipper profiles yet</EmptyTitle>
+            <EmptyDescription>
+              Clippers appear here once they fill in a profile. In the meantime,
+              browse everyone who has published one.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button nativeButton={false} render={<Link href="/discover" />}>
+              Find creators
+            </Button>
+          </EmptyContent>
+        </Empty>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {clipperProfiles.map((clipperProfile) => (
+            <ClipperDirectoryCard
+              key={clipperProfile.user_id}
+              clipperProfile={clipperProfile}
+              profile={profileById[clipperProfile.user_id]}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

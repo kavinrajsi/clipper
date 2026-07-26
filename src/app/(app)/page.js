@@ -9,6 +9,8 @@ import {
   UploadIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatCampaignRate, formatNumber } from "@/lib/format";
+import { BRAND_STEPS, CLIPPER_STEPS } from "@/lib/marketing";
 
 const PROCESS_STEPS = [
   [
@@ -47,27 +49,48 @@ export default function Home() {
   return (
     <div className="flex flex-1 flex-col">
       {/* Hero */}
-      <section className="border-b border-border px-6 py-20 sm:py-28">
-        <div className="mx-auto flex max-w-4xl flex-col items-start gap-8">
-          <span className="font-mono text-xs tracking-wide text-muted-foreground uppercase">
-            YouTube clip marketplace
-          </span>
-          <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
-            Brands post the campaign.
-            <br />
-            Clippers cut the footage.
+      <section className="border-b border-border px-6 py-14 sm:py-20">
+        <div className="mx-auto grid max-w-4xl items-start gap-x-10 gap-y-8 lg:grid-cols-[1.05fr_0.95fr]">
+          {/* Spans both columns: at text-5xl neither sentence fits a half-width
+              column, and a ragged 3-line wrap kills the two-sided parallel. */}
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl lg:col-span-2">
+            <span className="block">Brands post the campaign.</span>
+            <span className="block">Clippers cut the footage.</span>
           </h1>
-          <p className="max-w-xl text-lg leading-8 text-muted-foreground">
-            Clipper connects brands running YouTube campaigns with clippers
-            who edit and publish clips against them — paid per view or a flat
-            fee, set by the brand up front.
-          </p>
+
+          <div className="flex flex-col items-start gap-5">
+            <p className="text-lg leading-8 text-muted-foreground">
+              Paid per view or a flat fee — set by the brand up front.
+            </p>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <Button
+                size="lg"
+                className="h-11 px-6 text-base"
+                nativeButton={false}
+                render={<Link href="/login" />}
+              >
+                Post a campaign
+              </Button>
+              <Link
+                href="/campaigns"
+                className="group inline-flex items-center gap-1 rounded-sm text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+              >
+                Browse open campaigns
+                <ChevronRightIcon
+                  className="size-4 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+              </Link>
+            </div>
+          </div>
 
           {/* Signature element: timeline scrubber with cut marks + payout readout */}
-          <div className="w-full max-w-xl rounded-lg border border-border bg-card px-4 py-3">
-            <div className="relative flex h-8 items-center">
+          <div className="w-full rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center gap-1">
               <span className="font-mono text-xs text-muted-foreground">[</span>
-              <div className="relative mx-1 h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              {/* No overflow-hidden: the playhead is taller than the track and
+                  would render as a clipped square. */}
+              <div className="relative h-1.5 flex-1 rounded-full bg-muted">
                 <div className="absolute inset-y-0 left-[18%] right-[34%] rounded-full bg-foreground/70" />
                 <span
                   className="absolute top-1/2 left-[18%] size-2 -translate-y-1/2 rounded-full bg-[oklch(0.63_0.24_25)] motion-safe:animate-pulse"
@@ -76,30 +99,15 @@ export default function Home() {
               </div>
               <span className="font-mono text-xs text-muted-foreground">]</span>
             </div>
-            <div className="mt-1 flex items-center justify-between font-mono text-xs text-muted-foreground">
-              <span>00:00:04.120 in — 00:00:19.860 out</span>
-              <span className="text-foreground">128,402 views · $6.42 / 1,000 views</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button
-              size="lg"
-              className="h-11 px-6 text-base"
-              nativeButton={false}
-              render={<Link href="/login" />}
-            >
-              Post a campaign
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-11 px-6 text-base"
-              nativeButton={false}
-              render={<Link href="/campaigns" />}
-            >
-              Browse open campaigns
-            </Button>
+            <p className="mt-3 font-mono text-xs text-muted-foreground">
+              00:00:04.120 in — 00:00:19.860 out
+            </p>
+            <p className="mt-4 font-mono text-2xl tracking-tight">
+              {formatNumber(128402)} views
+            </p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              {formatCampaignRate({ payout_structure: "cpm", payout_rate: 520 })}
+            </p>
           </div>
         </div>
       </section>
@@ -141,48 +149,58 @@ export default function Home() {
       {/* Two pipelines */}
       <section className="border-b border-border px-6 py-16">
         <div className="mx-auto grid max-w-4xl gap-12 sm:grid-cols-2">
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col items-start gap-6">
             <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
               For brands
             </h2>
             <ol className="flex flex-col gap-5">
-              {[
-                ["01", "Post a campaign", "Set requirements, a deadline, and pay per view or a flat fee."],
-                ["02", "Review applicants", "Clippers apply with a note — approve or reject each one."],
-                ["03", "Clippers publish", "Approved clippers cut and post against your campaign."],
-                ["04", "Track it in analytics", "Views, likes, and comments roll up per connected channel."],
-              ].map(([n, title, body]) => (
+              {BRAND_STEPS.map(({ n, title, short }) => (
                 <li key={n} className="flex gap-4">
                   <span className="font-mono text-sm text-muted-foreground">{n}</span>
                   <div>
                     <p className="font-medium">{title}</p>
-                    <p className="text-sm text-muted-foreground">{body}</p>
+                    <p className="text-sm text-muted-foreground">{short}</p>
                   </div>
                 </li>
               ))}
             </ol>
+            <Link
+              href="/for-brands"
+              className="group inline-flex items-center gap-1 rounded-sm text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+            >
+              Learn more
+              <ChevronRightIcon
+                className="size-4 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            </Link>
           </div>
 
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col items-start gap-6">
             <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
               For clippers
             </h2>
             <ol className="flex flex-col gap-5">
-              {[
-                ["01", "Connect your channel", "Link YouTube by OAuth, or verify with a bio code."],
-                ["02", "Apply to campaigns", "Browse active campaigns and apply with a short pitch."],
-                ["03", "Cut & publish", "Once approved, edit and post your clip to your channel."],
-                ["04", "Get paid on terms", "Per-view or flat fee — whatever the campaign set."],
-              ].map(([n, title, body]) => (
+              {CLIPPER_STEPS.map(({ n, title, short }) => (
                 <li key={n} className="flex gap-4">
                   <span className="font-mono text-sm text-muted-foreground">{n}</span>
                   <div>
                     <p className="font-medium">{title}</p>
-                    <p className="text-sm text-muted-foreground">{body}</p>
+                    <p className="text-sm text-muted-foreground">{short}</p>
                   </div>
                 </li>
               ))}
             </ol>
+            <Link
+              href="/for-clippers"
+              className="group inline-flex items-center gap-1 rounded-sm text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+            >
+              Learn more
+              <ChevronRightIcon
+                className="size-4 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            </Link>
           </div>
         </div>
       </section>
@@ -217,18 +235,7 @@ export default function Home() {
       {/* Closing CTA */}
       <section className="px-6 py-16">
         <div className="mx-auto flex max-w-4xl flex-col items-start gap-4">
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Set the terms, or work to them.
-          </h2>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button
-              nativeButton={false}
-              render={<Link href="/login" />}
-            >
-              Sign in
-            </Button>
-          </div>
-          <div className="mt-2 flex gap-4 font-mono text-xs text-muted-foreground">
+          <div className="flex gap-4 font-mono text-xs text-muted-foreground">
             <Link href="/terms" className="hover:text-foreground">Terms</Link>
             <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link href="/clipper-terms" className="hover:text-foreground">Clipper terms</Link>

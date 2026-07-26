@@ -28,6 +28,7 @@ import {
   ShieldIcon,
   BookmarkIcon,
   MailOpenIcon,
+  MessagesSquareIcon,
   UsersRoundIcon,
 } from "lucide-react"
 
@@ -58,6 +59,11 @@ const clipperNavMain = [
     icon: <MegaphoneIcon />,
   },
   {
+    title: "Messages",
+    url: "/messages",
+    icon: <MessagesSquareIcon />,
+  },
+  {
     title: "Invitations",
     url: "/invitations",
     icon: <MailOpenIcon />,
@@ -79,6 +85,11 @@ const brandNavMain = [
     title: "Campaigns",
     url: "/campaigns",
     icon: <MegaphoneIcon />,
+  },
+  {
+    title: "Messages",
+    url: "/messages",
+    icon: <MessagesSquareIcon />,
   },
   {
     title: "Clippers",

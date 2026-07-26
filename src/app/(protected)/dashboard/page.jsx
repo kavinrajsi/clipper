@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation"
 import { AnalyticsChart } from "@/components/analytics-chart"
 import { DashboardSummaryCards } from "@/components/dashboard-summary-cards"
 import { MyApplicationsTable } from "@/components/my-applications-table"
@@ -10,6 +11,10 @@ export default async function Page() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect("/login?next=/dashboard")
+  }
 
   if (!isSuperAdmin(user)) {
     await requireRole(supabase, user, "clipper", "/campaigns")

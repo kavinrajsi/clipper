@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { isSuperAdmin } from "@/lib/admin";
+import { requireRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { ClipperDirectoryCard } from "@/components/clipper-directory-card";
 
@@ -10,6 +12,10 @@ export default async function ClippersPage() {
 
   if (!user) {
     redirect("/login?next=/clippers");
+  }
+
+  if (!isSuperAdmin(user)) {
+    await requireRole(supabase, user, "brand", "/dashboard");
   }
 
   const { data: clipperProfiles } = await supabase

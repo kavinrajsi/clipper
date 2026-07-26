@@ -71,6 +71,18 @@ export default async function CampaignsPage() {
     (applications ?? []).map((application) => [application.campaign_id, application.status])
   );
 
+  const [{ data: saves }, { data: portfolioItems }] = await Promise.all([
+    supabase.from("saved_campaigns").select("campaign_id").eq("user_id", user.id),
+    // Attachable work for the proposal form. Fetched once here rather than per
+    // card — every card offers the same portfolio.
+    supabase
+      .from("portfolio_items")
+      .select("id, title, thumbnail_url, view_count")
+      .eq("user_id", user.id)
+      .order("position", { ascending: true }),
+  ]);
+  const savedCampaignIds = new Set((saves ?? []).map((save) => save.campaign_id));
+
   const brandIds = [...new Set((campaigns ?? []).map((campaign) => campaign.brand_id))];
 
   let brandProfiles = [];
@@ -114,6 +126,7 @@ export default async function CampaignsPage() {
               role="clipper"
               applicationStatus={applicationByCampaign[campaign.id]}
               saved={savedCampaignIds.has(campaign.id)}
+              portfolioItems={portfolioItems ?? []}
             />
           ))}
           {(campaigns ?? []).length === 0 && (

@@ -6,7 +6,15 @@ import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { Spinner } from "@/components/ui/spinner"
+import { UsersRoundIcon } from "lucide-react"
 import { formatCurrency } from "@/lib/format"
 
 const STATUS_VARIANT = {
@@ -105,7 +113,19 @@ export function CampaignApplicationsList({ applications }) {
   }
 
   if (applications.length === 0) {
-    return <p className="text-sm text-muted-foreground">No applications yet.</p>;
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <UsersRoundIcon />
+          </EmptyMedia>
+          <EmptyTitle>No applications yet</EmptyTitle>
+          <EmptyDescription>
+            Invite creators directly from the Invited tab instead of waiting.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
   }
 
   return (
@@ -123,8 +143,53 @@ export function CampaignApplicationsList({ applications }) {
             </Avatar>
             <div className="flex-1 text-sm">
               <p className="font-medium">{application.clipper?.full_name ?? "Unknown clipper"}</p>
+              {/* Comparable terms, so a brand can weigh applicants against each
+                  other rather than on cover-letter length alone. Bids are only
+                  ever visible here, to the campaign owner. */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+                {application.bid_amount != null ? (
+                  <span>
+                    Bid <span className="font-medium text-foreground tabular-nums">
+                      {formatCurrency(application.bid_amount)}
+                    </span>
+                  </span>
+                ) : (
+                  <span>Accepts posted rate</span>
+                )}
+                {application.estimated_delivery_days != null && (
+                  <span>
+                    Delivers in{" "}
+                    <span className="font-medium text-foreground tabular-nums">
+                      {application.estimated_delivery_days}d
+                    </span>
+                  </span>
+                )}
+              </div>
               {application.message && (
-                <p className="text-muted-foreground">{application.message}</p>
+                <p className="mt-1 text-muted-foreground">{application.message}</p>
+              )}
+              {application.attachments?.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {application.attachments.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.video_url ?? "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={item.title ?? "Clip"}
+                      className="block w-24 shrink-0"
+                    >
+                      {item.thumbnail_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.thumbnail_url}
+                          alt={item.title ?? "Clip"}
+                          className="aspect-video w-full rounded object-cover hover:opacity-90"
+                        />
+                      )}
+                    </a>
+                  ))}
+                </div>
               )}
             </div>
             {application.status === "pending" ? (

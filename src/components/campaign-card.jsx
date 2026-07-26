@@ -18,15 +18,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
   Select,
   SelectContent,
   SelectGroup,
@@ -35,8 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
-import { Textarea } from "@/components/ui/textarea"
 import { CampaignForm } from "@/components/campaign-form"
+import { ProposalForm } from "@/components/proposal-form"
 import { SaveButton } from "@/components/save-button"
 import { openCampaignCheckout } from "@/lib/razorpay-checkout"
 import { formatCampaignRate, formatDate } from "@/lib/format"
@@ -62,7 +53,13 @@ const APPLICATION_LABEL = {
 }
 
 
-export function CampaignCard({ campaign, role, applicationStatus, saved = false }) {
+export function CampaignCard({
+  campaign,
+  role,
+  applicationStatus,
+  saved = false,
+  portfolioItems = [],
+}) {
   const router = useRouter()
   const supabase = createClient()
   const statusOptions =
@@ -70,9 +67,6 @@ export function CampaignCard({ campaign, role, applicationStatus, saved = false 
       ? STATUS_OPTIONS
       : STATUS_OPTIONS.filter((option) => option.value !== "active")
   const [statusLoading, setStatusLoading] = useState(false)
-  const [applyOpen, setApplyOpen] = useState(false)
-  const [message, setMessage] = useState("")
-  const [applying, setApplying] = useState(false)
   const [funding, setFunding] = useState(false)
   const [error, setError] = useState(null)
 
@@ -108,27 +102,6 @@ export function CampaignCard({ campaign, role, applicationStatus, saved = false 
     })
   }
 
-  async function handleApply(event) {
-    event.preventDefault()
-    setError(null)
-    setApplying(true)
-
-    const { error: insertError } = await supabase.from("campaign_applications").insert({
-      campaign_id: campaign.id,
-      message: message || null,
-    })
-
-    setApplying(false)
-
-    if (insertError) {
-      setError(insertError.message)
-      return
-    }
-
-    setApplyOpen(false)
-    setMessage("")
-    router.refresh()
-  }
 
   return (
     <Card>
@@ -215,36 +188,7 @@ export function CampaignCard({ campaign, role, applicationStatus, saved = false 
           (applicationStatus ? (
             <Badge variant="outline">{APPLICATION_LABEL[applicationStatus] ?? applicationStatus}</Badge>
           ) : (
-            <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
-              <DialogTrigger render={<Button size="sm" />}>Apply</DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Apply to {campaign.title}</DialogTitle>
-                  <DialogDescription>
-                    Optional note to the brand — why you're a good fit.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleApply}>
-                  <Textarea
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    rows={4}
-                    placeholder="Optional message"
-                  />
-                  {error && (
-                    <Alert variant="destructive" className="mt-3">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-                  <DialogFooter className="mt-4">
-                    <Button type="submit" disabled={applying}>
-                      {applying && <Spinner />}
-                      Submit application
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <ProposalForm campaign={campaign} portfolioItems={portfolioItems} />
           ))}
       </CardFooter>
     </Card>

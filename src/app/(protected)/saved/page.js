@@ -86,10 +86,17 @@ export default async function SavedPage() {
     redirect("/login?next=/saved");
   }
 
-  const [creators, { campaigns, applicationByCampaign }] = await Promise.all([
-    getSavedCreators(supabase, user.id),
-    getSavedCampaigns(supabase, user.id),
-  ]);
+  const [creators, { campaigns, applicationByCampaign }, { data: portfolioItems }] =
+    await Promise.all([
+      getSavedCreators(supabase, user.id),
+      getSavedCampaigns(supabase, user.id),
+      // Same portfolio the proposal form offers on /campaigns.
+      supabase
+        .from("portfolio_items")
+        .select("id, title, thumbnail_url, view_count")
+        .eq("user_id", user.id)
+        .order("position", { ascending: true }),
+    ]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -166,6 +173,7 @@ export default async function SavedPage() {
                     role="clipper"
                     applicationStatus={applicationByCampaign[campaign.id]}
                     saved
+                    portfolioItems={portfolioItems ?? []}
                   />
                 ))}
               </div>

@@ -69,11 +69,41 @@ export default async function CampaignDetailPage({ params }) {
     payouts.map((payout) => [payout.application_id, payout])
   );
 
+  // Portfolio clips attached to each proposal. The join is done here rather
+  // than nested in the applications query because proposal_attachments has no
+  // FK PostgREST can follow to portfolio_items' owner.
+  let attachmentsByApplication = {};
+  if (applicationIds.length > 0) {
+    const { data: attachmentRows } = await supabase
+      .from("proposal_attachments")
+      .select("id, application_id, portfolio_item_id")
+      .in("application_id", applicationIds);
+
+    const itemIds = [...new Set((attachmentRows ?? []).map((row) => row.portfolio_item_id))];
+    let items = [];
+    if (itemIds.length > 0) {
+      const { data } = await supabase
+        .from("portfolio_items")
+        .select("id, title, thumbnail_url, video_url, view_count")
+        .in("id", itemIds);
+      items = data ?? [];
+    }
+    const itemById = Object.fromEntries(items.map((item) => [item.id, item]));
+
+    attachmentsByApplication = (attachmentRows ?? []).reduce((acc, row) => {
+      const item = itemById[row.portfolio_item_id];
+      if (!item) return acc;
+      (acc[row.application_id] ??= []).push(item);
+      return acc;
+    }, {});
+  }
+
   const applicationsWithClipper = (applications ?? []).map((application) => ({
     ...application,
     clipper: profileById[application.clipper_id],
     submission: submissionByApplication[application.id],
     payout: payoutByApplication[application.id],
+    attachments: attachmentsByApplication[application.id] ?? [],
   }));
 
   // Invites, plus the pool of creators who could be invited. Saved creators

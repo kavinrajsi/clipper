@@ -53,7 +53,13 @@ export async function POST(request, { params }) {
     .single();
   const payoutMultiplier = connection?.payout_multiplier ?? 1.0;
 
-  let amount = campaign.payout_rate;
+  // A clipper may bid a rate other than the one posted. When they did, that is
+  // what was agreed and what gets paid; otherwise fall back to the campaign's
+  // posted rate. Applies to both payout structures — for per_view it is the
+  // rate per 1,000 views.
+  const agreedRate = submission.application?.bid_amount ?? campaign.payout_rate;
+
+  let amount = agreedRate;
 
   if (campaign.payout_structure === "per_view") {
     let viewCount = submission.view_count_at_submission ?? 0;
@@ -69,7 +75,7 @@ export async function POST(request, { params }) {
       if (video?.view_count != null) viewCount = video.view_count;
     }
 
-    amount = (viewCount / 1000) * campaign.payout_rate;
+    amount = (viewCount / 1000) * agreedRate;
   }
 
   amount = Math.round(amount * payoutMultiplier * 100) / 100;

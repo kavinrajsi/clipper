@@ -4,7 +4,9 @@ import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/format";
 import { extractYoutubeVideoId } from "@/lib/youtube";
+import { getWorkspaceRole } from "@/lib/workspaces";
 import { SubmissionReview } from "@/components/submission-review";
+import { RevisionRequestForm } from "@/components/revision-request-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -23,7 +25,9 @@ export default async function SubmissionReviewPage({ params }) {
   // an inaccessible submission is indistinguishable from a missing one.
   const { data: submission } = await supabase
     .from("campaign_submissions")
-    .select("*, application:campaign_applications(id, clipper_id, campaign:campaigns(id, title))")
+    .select(
+      "*, application:campaign_applications(id, clipper_id, campaign:campaigns(id, title, workspace_id))"
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -48,6 +52,27 @@ export default async function SubmissionReviewPage({ params }) {
   }
   const people = Object.fromEntries(profiles.map((p) => [p.id, p]));
   const campaign = submission.application?.campaign;
+
+  // Only the workspace can ask for changes; the creator answers with a new
+  // version. RLS enforces it too — this just decides whether to show the form.
+  const workspaceRole = campaign
+    ? await getWorkspaceRole(supabase, user, campaign.workspace_id)
+    : null;
+
+  const [{ data: revisionRows }, { data: versionRows }] = await Promise.all([
+    supabase
+      .from("revision_requests")
+      .select("*")
+      .eq("submission_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("campaign_submissions")
+      .select("id, revision_number, delivery_state, created_at")
+      .eq("application_id", submission.application_id)
+      .order("revision_number", { ascending: true }),
+  ]);
+
+  const unresolvedCount = annotations.filter((a) => !a.parent_id && !a.resolved_at).length;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -74,6 +99,16 @@ export default async function SubmissionReviewPage({ params }) {
             {submission.status}
           </Badge>
         </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-5xl">
+        <RevisionRequestForm
+          submission={submission}
+          revisionRequests={revisionRows ?? []}
+          versions={versionRows ?? []}
+          canRequest={Boolean(workspaceRole)}
+          unresolvedCount={unresolvedCount}
+        />
       </div>
 
       <div className="mx-auto w-full max-w-5xl">

@@ -24,7 +24,9 @@ export function AdminPayoutsTable({ payouts }) {
           <TableRow>
             <TableHead>Clipper</TableHead>
             <TableHead>Campaign</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead>To clipper</TableHead>
+            <TableHead>Platform fee</TableHead>
+            <TableHead>Brand charged</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Held at</TableHead>
             <TableHead>Released at</TableHead>
@@ -33,7 +35,7 @@ export function AdminPayoutsTable({ payouts }) {
         <TableBody>
           {payouts.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                 No payouts yet.
               </TableCell>
             </TableRow>
@@ -45,6 +47,14 @@ export function AdminPayoutsTable({ payouts }) {
                 </TableCell>
                 <TableCell>{payout.campaign_title ?? "—"}</TableCell>
                 <TableCell>{formatCurrency(payout.amount ?? 0)}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {formatCurrency(payout.platform_fee_amount ?? 0)}
+                </TableCell>
+                {/* What the campaign budget actually gave up. The clipper is
+                    never charged the fee — the brand pays it on top. */}
+                <TableCell>
+                  {formatCurrency(Number(payout.amount ?? 0) + Number(payout.platform_fee_amount ?? 0))}
+                </TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[payout.status] ?? "outline"}>
                     {payout.status}

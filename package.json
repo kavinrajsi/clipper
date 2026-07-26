@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "razorpay:probe": "bash scripts/razorpay-probe.sh"
+    "razorpay:probe": "bash scripts/razorpay-probe.sh",
+    "test:rls": "bash scripts/rls-test.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

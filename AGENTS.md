@@ -40,6 +40,16 @@ Every table has RLS enabled. Three patterns recur — match one of them for new 
 
 `campaign_payouts` has no client-side insert/update policy at all by design — every write there corresponds to a real Razorpay API call and only happens through the admin client.
 
+### ⚠ Policy cycles — read before adding an RLS policy
+
+**A policy on table A must not read table B if any policy on B reads A.** Postgres raises `42P17 infinite recursion` at *query* time, not at policy-creation time, so the policy is created happily and every affected query then fails. This shipped once: `campaigns`' "applied to" policy reads `campaign_applications`, whose brand policy reads `campaigns` — clippers could not list campaigns at all.
+
+Route the inner lookup through a `SECURITY DEFINER` helper instead (`has_applied_to_campaign`, `is_invited_to_campaign` in `20260727091000_fix_campaigns_policy_recursion.sql`). Those bypass RLS on the inner table — safe here because the tables are `postgres`-owned and do not `FORCE` row security — and each answers only a yes/no about the caller.
+
+**Checking `pg_policies` does not catch this.** Run `npm run test:rls` (`supabase/tests/rls.sql`), which impersonates real brand/clipper users and runs the queries the app runs, inside a transaction that rolls back. Every row should read PASS.
+
+Related: `eslint.config.mjs` enables `no-undef` because `next build` does not render dynamic Server Components and so will not catch a `ReferenceError` in one — that shipped once too.
+
 ## Payments (Razorpay)
 
 Uses **Razorpay Route** — the marketplace split-payment product (`account`/linked-account + `transfer` with `on_hold`). Note: Razorpay also has a product literally called "Escrow" (RazorpayX Escrow Plus) — that's for lending/co-lending pooled funds, unrelated, don't confuse the two. **Route is not currently enabled on the account — see the warning below before touching payout code.**

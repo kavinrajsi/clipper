@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { toast } from "sonner"
 
 function getInitials(name, email) {
   if (name) {
@@ -48,7 +49,6 @@ export function ProfileForm({ user, profile, className, ...props }) {
   const [selectedFile, setSelectedFile] = useState(null)
   const [role, setRole] = useState(profile?.role ?? "clipper")
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
   function handleFileChange(event) {
@@ -61,7 +61,6 @@ export function ProfileForm({ user, profile, className, ...props }) {
   async function handleSubmit(event) {
     event.preventDefault()
     setError(null)
-    setSuccess(false)
     setLoading(true)
 
     let nextAvatarUrl = avatarUrl
@@ -106,7 +105,7 @@ export function ProfileForm({ user, profile, className, ...props }) {
     setSelectedFile(null)
     setAvatarPreview(null)
     setLoading(false)
-    setSuccess(true)
+    toast.success("Profile updated.")
   }
 
   return (
@@ -121,11 +120,6 @@ export function ProfileForm({ user, profile, className, ...props }) {
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            {success && (
-              <Alert>
-                <AlertDescription>Profile updated.</AlertDescription>
               </Alert>
             )}
             <Field>

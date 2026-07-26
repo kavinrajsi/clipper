@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { Toaster } from "@/components/ui/sonner";
 import { isSuperAdmin } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -34,7 +33,6 @@ export default async function ProtectedLayout({ children }) {
         <SiteHeader />
         <div className="flex flex-1 flex-col">{children}</div>
       </SidebarInset>
-      <Toaster />
     </SidebarProvider>
   );
 }

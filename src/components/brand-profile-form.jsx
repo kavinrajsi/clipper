@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
+import { toast } from "sonner"
 
 export function BrandProfileForm({ userId, brandProfile, className, ...props }) {
   const supabase = createClient()
@@ -30,7 +31,6 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
   const [logoPreview, setLogoPreview] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
   function handleFileChange(event) {
@@ -43,7 +43,6 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
   async function handleSubmit(event) {
     event.preventDefault()
     setError(null)
-    setSuccess(false)
     setLoading(true)
 
     let nextLogoUrl = logoUrl
@@ -90,7 +89,7 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
     setSelectedFile(null)
     setLogoPreview(null)
     setLoading(false)
-    setSuccess(true)
+    toast.success("Brand profile saved.")
   }
 
   return (
@@ -99,11 +98,6 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        {success && (
-          <Alert>
-            <AlertDescription>Brand profile saved.</AlertDescription>
           </Alert>
         )}
 

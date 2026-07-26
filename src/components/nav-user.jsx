@@ -22,7 +22,14 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { EllipsisVerticalIcon, CircleUserRoundIcon, LogOutIcon } from "lucide-react"
+import {
+  EllipsisVerticalIcon,
+  CircleUserRoundIcon,
+  LogOutIcon,
+  MoonIcon,
+  SunIcon,
+} from "lucide-react"
+import { useTheme } from "next-themes"
 
 function getInitials(name, email) {
   if (name) {
@@ -40,6 +47,7 @@ export function NavUser({ user, profile }) {
   const router = useRouter()
   const supabase = createClient()
   const { isMobile } = useSidebar()
+  const { resolvedTheme, setTheme } = useTheme()
 
   const name =
     profile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email
@@ -100,6 +108,12 @@ export function NavUser({ user, profile }) {
               <DropdownMenuItem onClick={() => router.push("/profile")}>
                 <CircleUserRoundIcon />
                 Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              >
+                {resolvedTheme === "dark" ? <SunIcon /> : <MoonIcon />}
+                {resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

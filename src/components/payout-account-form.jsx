@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { toast } from "sonner"
 
 const STATUS_LABEL = {
   active: "Active",
@@ -43,7 +44,6 @@ export function PayoutAccountForm({ user, payoutAccount, className, ...props }) 
   )
   const [bankIfsc, setBankIfsc] = useState(payoutAccount?.bank_ifsc ?? "")
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState(payoutAccount?.status ?? null)
   const [checkingStatus, setCheckingStatus] = useState(false)
@@ -71,7 +71,6 @@ export function PayoutAccountForm({ user, payoutAccount, className, ...props }) 
   async function handleSubmit(event) {
     event.preventDefault()
     setError(null)
-    setSuccess(false)
     setLoading(true)
 
     const response = await fetch("/api/payments/payout-account", {
@@ -101,7 +100,7 @@ export function PayoutAccountForm({ user, payoutAccount, className, ...props }) 
     }
 
     setStatus("pending")
-    setSuccess(true)
+    toast.success("Payout account set up.")
   }
 
   return (
@@ -110,11 +109,6 @@ export function PayoutAccountForm({ user, payoutAccount, className, ...props }) 
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        {success && (
-          <Alert>
-            <AlertDescription>Payout account set up.</AlertDescription>
           </Alert>
         )}
         {status && (

@@ -25,6 +25,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { toast } from "sonner"
 
 const CATEGORIES = [
   "Gaming",
@@ -67,13 +68,11 @@ export function ClipperProfileForm({ userId, clipperProfile, className, ...props
     clipperProfile?.availability_status ?? "available"
   )
   const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(event) {
     event.preventDefault()
     setError(null)
-    setSuccess(false)
     setLoading(true)
 
     const { error: upsertError } = await supabase.from("clipper_profiles").upsert({
@@ -94,7 +93,7 @@ export function ClipperProfileForm({ userId, clipperProfile, className, ...props
     }
 
     setLoading(false)
-    setSuccess(true)
+    toast.success("Clipper profile saved.")
   }
 
   return (
@@ -103,11 +102,6 @@ export function ClipperProfileForm({ userId, clipperProfile, className, ...props
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        {success && (
-          <Alert>
-            <AlertDescription>Clipper profile saved.</AlertDescription>
           </Alert>
         )}
 

@@ -4,6 +4,7 @@ import { isSuperAdmin } from "@/lib/admin";
 import { requireRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { ClipperProfileForm } from "@/components/clipper-profile-form";
+import { PortfolioManager } from "@/components/portfolio-manager";
 
 export default async function ClipperProfilePage() {
   const supabase = await createClient();
@@ -19,11 +20,24 @@ export default async function ClipperProfilePage() {
     await requireRole(supabase, user, "clipper", "/campaigns");
   }
 
-  const { data: clipperProfile } = await supabase
-    .from("clipper_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  const [{ data: clipperProfile }, { data: portfolioItems }, { data: syncedVideos }] =
+    await Promise.all([
+      supabase.from("clipper_profiles").select("*").eq("user_id", user.id).single(),
+      supabase
+        .from("portfolio_items")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("position", { ascending: true }),
+      // Candidates for the picker — the connector already syncs these.
+      supabase
+        .from("youtube_videos")
+        .select("video_id, title, thumbnail_url, view_count, published_at")
+        .eq("user_id", user.id)
+        .order("published_at", { ascending: false })
+        .limit(50),
+    ]);
+
+  const items = portfolioItems ?? [];
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -52,6 +66,13 @@ export default async function ClipperProfilePage() {
       <ClipperProfileForm
         userId={user.id}
         clipperProfile={clipperProfile}
+        portfolioCount={items.length}
+        className="mx-auto w-full max-w-3xl"
+      />
+      <PortfolioManager
+        userId={user.id}
+        items={items}
+        syncedVideos={syncedVideos ?? []}
         className="mx-auto w-full max-w-3xl"
       />
     </div>

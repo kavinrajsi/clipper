@@ -59,7 +59,13 @@ const AVAILABILITY_OPTIONS = [
   { label: "Unavailable", value: "unavailable" },
 ]
 
-export function ClipperProfileForm({ userId, clipperProfile, className, ...props }) {
+export function ClipperProfileForm({
+  userId,
+  clipperProfile,
+  portfolioCount = 0,
+  className,
+  ...props
+}) {
   const supabase = createClient()
   const [handle, setHandle] = useState(clipperProfile?.handle ?? "")
   const [headline, setHeadline] = useState(clipperProfile?.headline ?? "")
@@ -87,6 +93,13 @@ export function ClipperProfileForm({ userId, clipperProfile, className, ...props
     // catch it here with a message that says what to do about it.
     if (isPublic && !normalisedHandle) {
       setError("Pick a handle before making your profile public.")
+      return
+    }
+
+    // A published profile with no work is worse than no profile — it's the
+    // first thing a brand looks for and its absence reads as inexperience.
+    if (isPublic && portfolioCount === 0) {
+      setError("Add at least one clip to your portfolio below before publishing.")
       return
     }
 

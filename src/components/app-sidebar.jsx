@@ -14,6 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   LayoutDashboardIcon,
@@ -79,6 +80,7 @@ const brandNavMain = [
 ]
 
 export function AppSidebar({ user, profile, isAdmin, ...props }) {
+  const { isMobile, setOpenMobile } = useSidebar()
   const isBrand = profile?.role === "brand"
   const baseNavMain = isBrand ? brandNavMain : clipperNavMain
   const navMain = isAdmin
@@ -93,6 +95,7 @@ export function AppSidebar({ user, profile, isAdmin, ...props }) {
           <SidebarMenuItem>
             <SidebarMenuButton
               className="data-[slot=sidebar-menu-button]:p-1.5!"
+              onClick={() => isMobile && setOpenMobile(false)}
               render={<Link href={homeUrl} />}>
               <Logo className="size-5!" />
               <span className="text-base font-semibold">Clipper</span>

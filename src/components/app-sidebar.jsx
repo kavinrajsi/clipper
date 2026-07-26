@@ -31,6 +31,7 @@ import {
   StarIcon,
   MessagesSquareIcon,
   UsersRoundIcon,
+  PaperclipIcon,
 } from "lucide-react"
 
 const clipperNavMain = [
@@ -116,6 +117,11 @@ const brandNavMain = [
     title: "Brand Profile",
     url: "/brand-profile",
     icon: <Building2Icon />,
+  },
+  {
+    title: "Brand assets",
+    url: "/workspace/assets",
+    icon: <PaperclipIcon />,
   },
   {
     title: "Team",

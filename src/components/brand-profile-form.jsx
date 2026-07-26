@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { uploadPublicImage } from "@/lib/storage"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -48,12 +49,12 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
     let nextLogoUrl = logoUrl
 
     if (selectedFile) {
-      const ext = selectedFile.name.split(".").pop()
-      const path = `${userId}/logo.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(path, selectedFile, { upsert: true })
+      const { url, error: uploadError } = await uploadPublicImage(
+        supabase,
+        userId,
+        selectedFile,
+        "logo"
+      )
 
       if (uploadError) {
         setError(uploadError.message)
@@ -61,10 +62,7 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
         return
       }
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(path)
-      nextLogoUrl = `${publicUrl}?updated=${Date.now()}`
+      nextLogoUrl = url
     }
 
     const { error: upsertError } = await supabase.from("brand_profiles").upsert({

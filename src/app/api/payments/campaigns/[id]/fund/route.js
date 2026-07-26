@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createOrder } from "@/lib/razorpay";
 import { createClient } from "@/lib/supabase/server";
+import { MONEY_ROLES, requireCampaignAccess } from "@/lib/workspaces";
 
 export async function POST(request, { params }) {
   const { id } = await params;
@@ -13,15 +14,15 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const { data: campaign, error: campaignError } = await supabase
-    .from("campaigns")
-    .select("id, title, brand_id, budget, funding_status")
-    .eq("id", id)
-    .single();
+  // Funding moves money, so membership alone is not enough — a `member` can
+  // run a campaign but cannot pay for it.
+  const access = await requireCampaignAccess(supabase, user, id, MONEY_ROLES);
 
-  if (campaignError || !campaign || campaign.brand_id !== user.id) {
+  if (!access) {
     return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
   }
+
+  const { campaign } = access;
 
   if (!campaign.budget || campaign.budget <= 0) {
     return NextResponse.json({ error: "Set a budget before funding this campaign." }, { status: 400 });

@@ -52,7 +52,7 @@ const VISIBILITY_OPTIONS = [
   },
 ]
 
-export function CampaignForm({ brandId, campaign }) {
+export function CampaignForm({ brandId, campaign, workspaceId }) {
   const isEditing = Boolean(campaign)
   const financialFieldsLocked = isEditing && campaign.funding_status !== "unfunded"
 
@@ -122,7 +122,7 @@ export function CampaignForm({ brandId, campaign }) {
 
     const { data: newCampaign, error: insertError } = await supabase
       .from("campaigns")
-      .insert({ brand_id: brandId, ...fields })
+      .insert({ brand_id: brandId, workspace_id: workspaceId ?? campaign?.workspace_id, ...fields })
       .select()
       .single()
 

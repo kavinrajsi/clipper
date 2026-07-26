@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveWorkspace } from "@/lib/workspaces";
 import { CampaignCard } from "@/components/campaign-card";
 import { CampaignForm } from "@/components/campaign-form";
 
@@ -22,11 +23,15 @@ export default async function CampaignsPage() {
   const role = profile?.role ?? "clipper";
 
   if (role === "brand") {
-    const { data: campaigns } = await supabase
-      .from("campaigns")
-      .select("*")
-      .eq("brand_id", user.id)
-      .order("created_at", { ascending: false });
+    const workspace = await getActiveWorkspace(supabase, user);
+
+    const { data: campaigns } = workspace
+      ? await supabase
+          .from("campaigns")
+          .select("*")
+          .eq("workspace_id", workspace.id)
+          .order("created_at", { ascending: false })
+      : { data: [] };
 
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">
@@ -38,7 +43,7 @@ export default async function CampaignsPage() {
                 Create and manage campaigns for clippers.
               </p>
             </div>
-            <CampaignForm brandId={user.id} />
+            <CampaignForm brandId={user.id} workspaceId={workspace?.id} />
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             {(campaigns ?? []).map((campaign) => (

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceRole } from "@/lib/workspaces";
 import { CampaignApplicationsList } from "@/components/campaign-applications-list";
 import { CampaignInvitesManager } from "@/components/campaign-invites-manager";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,11 @@ export default async function CampaignDetailPage({ params }) {
     .eq("id", id)
     .single();
 
-  if (!campaign || campaign.brand_id !== user.id) {
+  const workspaceRole = campaign
+    ? await getWorkspaceRole(supabase, user, campaign.workspace_id)
+    : null;
+
+  if (!campaign || !workspaceRole) {
     redirect("/campaigns");
   }
 

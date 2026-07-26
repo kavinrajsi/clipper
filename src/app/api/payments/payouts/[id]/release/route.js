@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { releaseTransferHold } from "@/lib/razorpay";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { MONEY_ROLES, getWorkspaceRole } from "@/lib/workspaces";
 
 export async function POST(request, { params }) {
   const { id } = await params;
@@ -22,7 +23,12 @@ export async function POST(request, { params }) {
 
   const campaign = payout?.application?.campaign;
 
-  if (payoutError || !payout || !campaign || campaign.brand_id !== user.id) {
+  // Releasing a payout moves money. This route switches to the service-role
+  // client below, which bypasses RLS entirely, so this check IS the
+  // enforcement — not a convenience on top of a policy.
+  const role = campaign ? await getWorkspaceRole(supabase, user, campaign.workspace_id) : null;
+
+  if (payoutError || !payout || !campaign || !role || !MONEY_ROLES.includes(role)) {
     return NextResponse.json({ error: "Payout not found" }, { status: 404 });
   }
 

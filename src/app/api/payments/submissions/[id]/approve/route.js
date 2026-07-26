@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHeldTransfer } from "@/lib/razorpay";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceRole } from "@/lib/workspaces";
 import { extractYoutubeVideoId } from "@/lib/youtube";
 
 export async function POST(request, { params }) {
@@ -23,7 +24,12 @@ export async function POST(request, { params }) {
 
   const campaign = submission?.application?.campaign;
 
-  if (submissionError || !submission || !campaign || campaign.brand_id !== user.id) {
+  // Approving a submission is creative review, so any workspace member may do
+  // it. The held transfer it creates is not yet a release — that still needs a
+  // money role, enforced in payouts/[id]/release.
+  const role = campaign ? await getWorkspaceRole(supabase, user, campaign.workspace_id) : null;
+
+  if (submissionError || !submission || !campaign || !role) {
     return NextResponse.json({ error: "Submission not found" }, { status: 404 });
   }
 

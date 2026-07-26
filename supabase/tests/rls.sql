@@ -41,6 +41,7 @@ do $$
 declare
   brand_id  uuid;
   clip_id   uuid;
+  ws_id     uuid;
   c_public  uuid;
   c_invite  uuid;
   n         int;
@@ -59,18 +60,56 @@ begin
     return;
   end if;
 
+  -- The brand's workspace. Campaigns belong to a workspace now, so the fixtures
+  -- must be created inside one or the membership policies see nothing.
+  select w.id into ws_id from public.workspaces w where w.owner_id = brand_id limit 1;
+
+  if ws_id is null then
+    insert into rls_results(area, check_name, outcome)
+    values ('setup', 'brand has a workspace', 'SKIP - no workspace for the brand user');
+    return;
+  end if;
+
   insert into public.campaigns
-    (brand_id,title,platform,payout_structure,payout_rate,budget,status,funding_status,visibility)
-  values (brand_id,'RLS suite public','youtube','flat_fee',100,1000,'active','paid','public')
+    (brand_id,workspace_id,title,platform,payout_structure,payout_rate,budget,status,funding_status,visibility)
+  values (brand_id,ws_id,'RLS suite public','youtube','flat_fee',100,1000,'active','paid','public')
   returning id into c_public;
 
   insert into public.campaigns
-    (brand_id,title,platform,payout_structure,payout_rate,budget,status,funding_status,visibility)
-  values (brand_id,'RLS suite invite','youtube','flat_fee',100,1000,'active','paid','invite_only')
+    (brand_id,workspace_id,title,platform,payout_structure,payout_rate,budget,status,funding_status,visibility)
+  values (brand_id,ws_id,'RLS suite invite','youtube','flat_fee',100,1000,'active','paid','invite_only')
   returning id into c_invite;
 
   ---------------------------------------------------------------------------
+  -- 0. Workspaces. A campaign belongs to a workspace, and membership is what
+  --    grants access. Pending members (accepted_at null) get nothing.
+  ---------------------------------------------------------------------------
+  select count(*) into n from public.campaigns where workspace_id is null;
+  insert into rls_results(area, check_name, outcome)
+  values ('workspaces', 'every campaign has a workspace',
+          case when n = 0 then 'PASS' else 'FAIL ' || n || ' orphaned' end);
+
+  select count(*) into n
+    from public.campaigns c
+    join public.workspaces w on w.id = c.workspace_id
+   where w.owner_id <> c.brand_id;
+  insert into rls_results(area, check_name, outcome)
+  values ('workspaces', 'workspace owner matches original brand_id',
+          case when n = 0 then 'PASS' else 'FAIL ' || n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.workspaces;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('workspaces', 'non-member sees no workspace',
+          case when n = 0 then 'PASS' else 'FAIL saw '||n end);
+
+  ---------------------------------------------------------------------------
   -- 1. Recursion guard. Any cycle surfaces here as 42P17.
+  --    workspace_members' own policy reads workspace_members, so this is
+  --    exactly where a missing SECURITY DEFINER helper shows up.
   ---------------------------------------------------------------------------
   set local role authenticated;
   perform set_config('request.jwt.claims',
@@ -81,6 +120,8 @@ begin
     perform count(*) from public.campaign_invites;
     perform count(*) from public.clipper_profiles;
     perform count(*) from public.saved_campaigns;
+    perform count(*) from public.workspaces;
+    perform count(*) from public.workspace_members;
     msg := 'PASS';
   exception when others then
     msg := 'FAIL ' || sqlstate || ' ' || left(sqlerrm, 70);
@@ -96,6 +137,10 @@ begin
     perform count(*) from public.campaigns;
     perform count(*) from public.campaign_applications;
     perform count(*) from public.campaign_invites;
+    perform count(*) from public.workspaces;
+    perform count(*) from public.workspace_members;
+    perform count(*) from public.campaign_payouts;
+    perform count(*) from public.activity_events;
     msg := 'PASS';
   exception when others then
     msg := 'FAIL ' || sqlstate || ' ' || left(sqlerrm, 70);

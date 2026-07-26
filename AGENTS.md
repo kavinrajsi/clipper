@@ -42,11 +42,31 @@ Every table has RLS enabled. Three patterns recur — match one of them for new 
 
 ## Payments (Razorpay)
 
-Uses **Razorpay Route** — the marketplace split-payment product (`account`/linked-account + `transfer` with `on_hold`). Note: Razorpay also has a product literally called "Escrow" (RazorpayX Escrow Plus) — that's for lending/co-lending pooled funds, unrelated, don't confuse the two.
+Uses **Razorpay Route** — the marketplace split-payment product (`account`/linked-account + `transfer` with `on_hold`). Note: Razorpay also has a product literally called "Escrow" (RazorpayX Escrow Plus) — that's for lending/co-lending pooled funds, unrelated, don't confuse the two. **Route is not currently enabled on the account — see the warning below before touching payout code.**
 
 Flow: brand creates a campaign → funds the full budget via Razorpay Checkout (`src/lib/razorpay-checkout.js` client-side, `/api/payments/campaigns/[id]/fund` + `/verify` server-side, signature-verified before the campaign activates) → clipper applies → brand approves the application → clipper submits a video (`campaign_submissions`) → brand approves the submission, which computes the payout (flat fee, or view-count × CPM using `youtube_videos.view_count` if synced, multiplied by the clipper's `youtube_connections.payout_multiplier` verification-tier discount), checks it against the campaign's remaining budget, and creates a held Razorpay transfer → brand releases the hold (`/api/payments/payouts/[id]/release`).
 
-`RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`/`NEXT_PUBLIC_RAZORPAY_KEY_ID` may be placeholder values — every real Razorpay API call 401s until they're replaced with real (test or live) keys.
+### ⚠ Route is NOT enabled on the Razorpay account — the payout half cannot run
+
+Probed directly with the test keys in `.env.local` on 2026-07-26. **The keys are real and auth succeeds** — an earlier version of this file claimed every call 401s on placeholder keys, which is wrong. What actually fails is the Route product:
+
+| Endpoint | Result |
+|---|---|
+| `GET /v1/payments`, `GET /v1/settlements` | **200** — real captured payment + settlement returned |
+| `GET /v1/refunds`, `GET /v1/payments/{id}/refunds` | **200** — refunds are usable |
+| `GET /v2/accounts` (linked accounts) | **404** `no Route matched with those values` |
+| `GET`/`POST /v1/transfers` (direct transfers) | **400** `The requested URL was not found on the server` |
+| `GET`/`POST /v1/payments/{id}/transfers` | **400** same |
+| `GET /v1/payouts` (RazorpayX) | **400** `Access to requested resource not available` |
+
+Consequences for anyone working in this area:
+
+- **Campaign funding works** (orders/payments/checkout are core API).
+- **`createLinkedAccount()` and `createHeldTransfer()` in `src/lib/razorpay.js` target endpoints that 400 on this account.** Clipper payout-account onboarding, held transfers, and releases have never been able to succeed. Don't debug that code assuming it once worked.
+- **Refunds DO work** — core API, unaffected. Partial refunds are supported and multiple partials are allowed as long as the sum stays within the captured amount. This is currently the only working way to move money back out of the platform account.
+- **RazorpayX Payouts is also unavailable**, but note the different error shape: Route returns "URL not found" (product not routed), RazorpayX returns "Access to requested resource not available" (endpoint exists, not authorised).
+
+Fixing this is a support request to Razorpay to enable Route on test + live, not a code change. Direct Transfers (`POST /v1/transfers`) is *separately* on-demand and should be asked for in the same request — see `docs/product/08-monetisation.md`.
 
 ## Schema reference (live project, not local files — see below)
 
@@ -59,7 +79,7 @@ Flow: brand creates a campaign → funds the full budget via Razorpay Checkout (
 
 - Google OAuth signup skips any role picker — always defaults to `clipper`; changing role happens on `/profile` afterward.
 - No brand-facing billing/spend-history page (aggregate spend across campaigns).
-- Cancelling a funded campaign doesn't refund or reconcile the held Razorpay funds.
+- Cancelling a funded campaign doesn't refund or reconcile the held Razorpay funds. Nor does *normal completion* — a campaign funded at ₹100,000 that pays out ₹60,000 leaves ₹40,000 in the platform account with no code path to return it. Underspend is the normal case for per-view campaigns, not an edge case. The Refunds API is available and supports partial refunds, so this is buildable today; it just isn't built.
 - Per-view payouts depend on the clipper having synced the submitted video via Connectors — if it's not in `youtube_videos`, the payout falls back to a submission-time snapshot (`view_count_at_submission`), which may be `null` if that wasn't captured either.
 - Brand-only pages aren't route-gated by role (see "Auth and roles" above).
 

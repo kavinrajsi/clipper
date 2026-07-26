@@ -40,8 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local docs
-/docs
+# docs ARE committed (architecture + product specs live in docs/).
+# Only this scratch path stays local.
+/docs/local
 
 # supabase (CLI local dev — migrations/config ARE committed, only local state is ignored)
 /supabase/.branches

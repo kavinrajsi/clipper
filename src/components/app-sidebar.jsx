@@ -28,6 +28,7 @@ import {
   ShieldIcon,
   BookmarkIcon,
   MailOpenIcon,
+  StarIcon,
   UsersRoundIcon,
 } from "lucide-react"
 
@@ -68,6 +69,11 @@ const clipperNavMain = [
     icon: <BookmarkIcon />,
   },
   {
+    title: "Reviews",
+    url: "/reviews",
+    icon: <StarIcon />,
+  },
+  {
     title: "Payout Account",
     url: "/payout-account",
     icon: <WalletIcon />,
@@ -89,6 +95,11 @@ const brandNavMain = [
     title: "Saved",
     url: "/saved",
     icon: <BookmarkIcon />,
+  },
+  {
+    title: "Reviews",
+    url: "/reviews",
+    icon: <StarIcon />,
   },
   {
     title: "Brand Profile",

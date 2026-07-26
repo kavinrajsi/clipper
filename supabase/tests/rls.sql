@@ -47,6 +47,8 @@ declare
   n         int;
   ok        boolean;
   msg       text;
+  app_id    uuid;
+  pay_id    uuid;
 
   procedure_note text;
 begin
@@ -390,6 +392,148 @@ begin
   insert into rls_results(area, check_name, outcome)
   values ('bids', 'campaign owner CAN read a bid',
           case when n = 1 then 'PASS' else 'FAIL saw '||n end);
+
+  ---------------------------------------------------------------------------
+  -- 8. Reviews. The anti-fraud property is that a review requires a RELEASED
+  --    payout on the engagement being reviewed, enforced in the insert policy
+  --    rather than in the route. These cases are the only way to know that
+  --    holds: Razorpay Route is disabled on this account, so no payout reaches
+  --    'released' through the app and the gate cannot be exercised by clicking.
+  ---------------------------------------------------------------------------
+  select id into app_id from public.campaign_applications
+   where campaign_id = c_invite and clipper_id = clip_id limit 1;
+
+  insert into public.campaign_payouts (application_id, clipper_id, amount, status)
+  values (app_id, clip_id, 100, 'held')
+  returning id into pay_id;
+
+  -- Held, not released: no review yet.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.reviews (application_id, author_id, subject_id, direction, rating)
+    values (app_id, brand_id, clip_id, 'brand_to_clipper', 5);
+    msg := 'FAIL review allowed on a held payout';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'PASS (' || sqlstate || ')';
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'held payout CANNOT be reviewed', msg);
+
+  perform set_config('request.jwt.claims', '', true);
+  update public.campaign_payouts set status = 'released', released_at = now()
+   where id = pay_id;
+
+  -- Released: the brand side may now write exactly one review.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.reviews (application_id, author_id, subject_id, direction, rating, body)
+    values (app_id, brand_id, clip_id, 'brand_to_clipper', 5, 'RLS suite');
+    msg := 'PASS';
+  exception when insufficient_privilege then msg := 'FAIL blocked after release';
+           when others then msg := 'FAIL ' || sqlstate || ' ' || left(sqlerrm, 60);
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'released payout CAN be reviewed', msg);
+
+  -- One per side. A second attempt is the unique constraint, not a policy.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.reviews (application_id, author_id, subject_id, direction, rating)
+    values (app_id, brand_id, clip_id, 'brand_to_clipper', 1);
+    msg := 'FAIL second review allowed';
+  exception when unique_violation then msg := 'PASS';
+           when others then msg := 'PASS (' || sqlstate || ')';
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'CANNOT review the same engagement twice', msg);
+
+  -- The clipper was not party to the brand side and cannot author it.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.reviews (application_id, author_id, subject_id, direction, rating)
+    values (app_id, clip_id, clip_id, 'brand_to_clipper', 5);
+    msg := 'FAIL self-review allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'PASS (' || sqlstate || ')';
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'clipper CANNOT forge the brand-side review', msg);
+
+  -- Double-blind: one side submitted, so nothing is published or public yet.
+  perform set_config('request.jwt.claims', '', true);
+  select count(*) into n from public.reviews
+   where application_id = app_id and is_published;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'a lone review stays unpublished',
+          case when n = 0 then 'PASS' else 'FAIL published '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.reviews where application_id = app_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'subject CANNOT read an unpublished review about them',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  -- The clipper submits theirs; the trigger publishes both.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.reviews (application_id, author_id, subject_id, direction, rating)
+    values (app_id, clip_id, brand_id, 'clipper_to_brand', 4);
+    msg := 'PASS';
+  exception when others then msg := 'FAIL ' || sqlstate || ' ' || left(sqlerrm, 60);
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'clipper CAN review the brand', msg);
+
+  perform set_config('request.jwt.claims', '', true);
+  select count(*) into n from public.reviews
+   where application_id = app_id and is_published;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'both publish once the pair is complete',
+          case when n = 2 then 'PASS' else 'FAIL published '||n end);
+
+  -- author_name is captured server-side so the review survives the account.
+  -- Asserts the trigger COPIED the name, not that it is non-null: full_name is
+  -- nullable on profiles, and a null there must copy through as a null here
+  -- rather than being treated as a trigger failure.
+  select count(*) into n
+    from public.reviews rev
+    join public.profiles pr on pr.id = rev.author_id
+   where rev.application_id = app_id
+     and rev.author_name is not distinct from pr.full_name;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'author_name is denormalised at write time',
+          case when n = 2 then 'PASS' else 'FAIL '||n||' of 2' end);
+
+  -- Published reviews are immutable, including by their author.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  update public.reviews set body = 'edited after publication'
+   where application_id = app_id and direction = 'brand_to_clipper';
+  get diagnostics n = row_count;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('reviews', 'a published review CANNOT be edited',
+          case when n = 0 then 'PASS' else 'FAIL updated '||n end);
+
 end $$;
 
 select area, check_name, outcome from rls_results order by ord;

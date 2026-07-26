@@ -187,7 +187,7 @@ export async function POST(request, { params }) {
         status: "held",
         held_at: new Date().toISOString(),
       },
-      { onConflict: "application_id" }
+      { onConflict: "application_id,milestone_id" }
     );
 
     if (payoutError) throw payoutError;
@@ -207,7 +207,7 @@ export async function POST(request, { params }) {
         platform_fee_amount: platformFeeAmount,
         status: "failed",
       },
-      { onConflict: "application_id" }
+      { onConflict: "application_id,milestone_id" }
     );
 
     return NextResponse.json({ error: "Couldn't create the payout transfer." }, { status: 502 });

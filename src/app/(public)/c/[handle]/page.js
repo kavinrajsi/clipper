@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatClipperRate, formatDate, formatNumber } from "@/lib/format";
+import { FollowButton } from "@/components/follow-button";
 import { SaveButton } from "@/components/save-button";
 import { VerifiedBadge } from "@/components/verified-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -58,14 +59,24 @@ async function getProfile(handle) {
   } = await supabase.auth.getUser();
 
   let saved = false;
+  let following = false;
   if (user && user.id !== profile.user_id) {
-    const { data } = await supabase
-      .from("saved_creators")
-      .select("creator_id")
-      .eq("user_id", user.id)
-      .eq("creator_id", profile.user_id)
-      .maybeSingle();
-    saved = Boolean(data);
+    const [{ data: savedRow }, { data: followRow }] = await Promise.all([
+      supabase
+        .from("saved_creators")
+        .select("creator_id")
+        .eq("user_id", user.id)
+        .eq("creator_id", profile.user_id)
+        .maybeSingle(),
+      supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", user.id)
+        .eq("following_id", profile.user_id)
+        .maybeSingle(),
+    ]);
+    saved = Boolean(savedRow);
+    following = Boolean(followRow);
   }
 
   return {
@@ -75,6 +86,7 @@ async function getProfile(handle) {
     stats,
     portfolio: portfolio ?? [],
     saved,
+    following,
     viewer: user,
   };
 }
@@ -103,7 +115,7 @@ export default async function CreatorProfilePage({ params }) {
   // Unpublished and nonexistent both land here by design.
   if (!data) notFound();
 
-  const { profile, account, verification, stats, portfolio, saved, viewer } = data;
+  const { profile, account, verification, stats, portfolio, saved, following, viewer } = data;
   const isSelf = viewer?.id === profile.user_id;
   const name = account?.full_name ?? `@${profile.handle}`;
   const rate = formatClipperRate(profile);
@@ -141,6 +153,14 @@ export default async function CreatorProfilePage({ params }) {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            {!isSelf && (
+              <FollowButton
+                creatorId={profile.user_id}
+                initialFollowing={following}
+                isAuthenticated={Boolean(viewer)}
+                signInHref={`/login?next=${encodeURIComponent(`/c/${profile.handle}`)}`}
+              />
+            )}
             {!isSelf && (
               <SaveButton
                 type="creator"

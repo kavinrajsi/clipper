@@ -232,6 +232,40 @@ begin
           case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
 
   ---------------------------------------------------------------------------
+  -- 6b. Notifications. Written only by triggers; a client must never be able
+  --     to forge one into someone else's bell, nor read another user's.
+  ---------------------------------------------------------------------------
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.notifications (user_id, kind, title)
+    values (brand_id, 'phish', 'Click here');
+    msg := 'FAIL client insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'PASS (' || sqlstate || ')';
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('notifications', 'client CANNOT forge a notification', msg);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.notifications where user_id = brand_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('notifications', 'client CANNOT read another user''s notifications',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  -- The application inserted above should have notified the brand, via trigger.
+  select count(*) into n from public.notifications
+   where user_id = brand_id and kind = 'application_received';
+  insert into rls_results(area, check_name, outcome)
+  values ('notifications', 'application fires a notification',
+          case when n >= 1 then 'PASS' else 'FAIL none' end);
+
+  ---------------------------------------------------------------------------
   -- 7. Bids are visible only to the campaign owner.
   ---------------------------------------------------------------------------
   update public.campaign_applications set bid_amount = 4242

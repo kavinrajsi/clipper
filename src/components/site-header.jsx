@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { NotificationBell } from "@/components/notification-bell"
 
 const PAGE_TITLES = {
   "/dashboard": "Dashboard",
@@ -21,6 +22,9 @@ const PAGE_TITLES = {
   "/payout-account": "Payout Account",
   "/brand-profile": "Brand Profile",
   "/clippers": "Clippers",
+  "/saved": "Saved",
+  "/invitations": "Invitations",
+  "/notifications": "Notifications",
 }
 
 function getPageTitle(pathname) {
@@ -30,7 +34,7 @@ function getPageTitle(pathname) {
   return prefix ? PAGE_TITLES[prefix] : "Dashboard"
 }
 
-export function SiteHeader() {
+export function SiteHeader({ notifications = [], unreadCount = 0 }) {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
 
@@ -47,6 +51,12 @@ export function SiteHeader() {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
+        <div className="ml-auto">
+          <NotificationBell
+            initialNotifications={notifications}
+            initialUnread={unreadCount}
+          />
+        </div>
       </div>
     </header>
   );

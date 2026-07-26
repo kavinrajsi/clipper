@@ -14,6 +14,7 @@ const PROTECTED_PATH_PREFIXES = [
   "/clippers",
   "/saved",
   "/invitations",
+  "/notifications",
 ];
 
 export async function updateSession(request) {

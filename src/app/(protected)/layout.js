@@ -15,11 +15,22 @@ export default async function ProtectedLayout({ children }) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, avatar_url, role")
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile }, { data: notifications }, { count: unreadCount }] = await Promise.all([
+    supabase.from("profiles").select("full_name, avatar_url, role").eq("id", user.id).single(),
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    // head:true fetches the count without the rows — this runs on every
+    // protected page load.
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .is("read_at", null),
+  ]);
 
   return (
     <SidebarProvider
@@ -30,7 +41,10 @@ export default async function ProtectedLayout({ children }) {
     >
       <AppSidebar user={user} profile={profile} isAdmin={isSuperAdmin(user)} />
       <SidebarInset>
-        <SiteHeader />
+        <SiteHeader
+          notifications={notifications ?? []}
+          unreadCount={unreadCount ?? 0}
+        />
         <div className="flex flex-1 flex-col">{children}</div>
       </SidebarInset>
     </SidebarProvider>

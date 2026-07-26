@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatClipperRate, formatDate, formatNumber } from "@/lib/format";
 import { FollowButton } from "@/components/follow-button";
+import { ReviewList } from "@/components/review-list";
 import { SaveButton } from "@/components/save-button";
+import { RatingSummary } from "@/components/star-rating";
 import { VerifiedBadge } from "@/components/verified-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -42,17 +44,32 @@ async function getProfile(handle) {
 
   if (!profile) return null;
 
-  const [{ data: account }, { data: verification }, { data: stats }, { data: portfolio }] =
-    await Promise.all([
-      supabase.from("profiles").select("full_name, avatar_url").eq("id", profile.user_id).maybeSingle(),
-      supabase.from("creator_verification").select("*").eq("user_id", profile.user_id).maybeSingle(),
-      supabase.from("creator_stats").select("*").eq("user_id", profile.user_id).maybeSingle(),
-      supabase
-        .from("portfolio_items")
-        .select("*")
-        .eq("user_id", profile.user_id)
-        .order("position", { ascending: true }),
-    ]);
+  const [
+    { data: account },
+    { data: verification },
+    { data: stats },
+    { data: portfolio },
+    { data: reviews },
+  ] = await Promise.all([
+    supabase.from("profiles").select("full_name, avatar_url").eq("id", profile.user_id).maybeSingle(),
+    supabase.from("creator_verification").select("*").eq("user_id", profile.user_id).maybeSingle(),
+    supabase.from("creator_stats").select("*").eq("user_id", profile.user_id).maybeSingle(),
+    supabase
+      .from("portfolio_items")
+      .select("*")
+      .eq("user_id", profile.user_id)
+      .order("position", { ascending: true }),
+    // Only brand-to-clipper reviews belong on a creator profile. The select
+    // policy already hides anything unpublished from anyone but its author, so
+    // this needs no is_published filter of its own — and must not have one, or
+    // it would drop reviews the 14-day window released.
+    supabase
+      .from("reviews")
+      .select("*")
+      .eq("subject_id", profile.user_id)
+      .eq("direction", "brand_to_clipper")
+      .order("created_at", { ascending: false }),
+  ]);
 
   const {
     data: { user },
@@ -79,12 +96,22 @@ async function getProfile(handle) {
     following = Boolean(followRow);
   }
 
+  // The select policy also returns the viewer's OWN unpublished review, which is
+  // right for /reviews and wrong here — it would put a row on the page that
+  // creator_stats deliberately excludes from the count. Apply the view's
+  // predicate so the list and the aggregate always agree.
+  const windowOpensAt = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const publicReviews = (reviews ?? []).filter(
+    (r) => r.is_published || new Date(r.created_at).getTime() < windowOpensAt,
+  );
+
   return {
     profile,
     account,
     verification,
     stats,
     portfolio: portfolio ?? [],
+    reviews: publicReviews,
     saved,
     following,
     viewer: user,
@@ -115,7 +142,8 @@ export default async function CreatorProfilePage({ params }) {
   // Unpublished and nonexistent both land here by design.
   if (!data) notFound();
 
-  const { profile, account, verification, stats, portfolio, saved, following, viewer } = data;
+  const { profile, account, verification, stats, portfolio, reviews, saved, following, viewer } =
+    data;
   const isSelf = viewer?.id === profile.user_id;
   const name = account?.full_name ?? `@${profile.handle}`;
   const rate = formatClipperRate(profile);
@@ -150,6 +178,8 @@ export default async function CreatorProfilePage({ params }) {
                 <Badge variant={availability.variant}>{availability.label}</Badge>
               )}
             </div>
+
+            <RatingSummary stats={stats} />
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -284,6 +314,14 @@ export default async function CreatorProfilePage({ params }) {
               </div>
             </div>
           )}
+        </div>
+
+        <Separator className="my-6" />
+        <h2 className="text-lg font-semibold">
+          Reviews{reviews.length > 0 && ` (${reviews.length})`}
+        </h2>
+        <div className="mt-4">
+          <ReviewList reviews={reviews} stats={stats} />
         </div>
       </div>
     </div>

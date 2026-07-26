@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { MailOpenIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { isSuperAdmin } from "@/lib/admin";
-import { requireRole } from "@/lib/roles";
+import { getPendingWorkspaceInvites } from "@/lib/workspaces";
 import { formatCampaignRate, formatDate } from "@/lib/format";
 import { InvitationActions } from "@/components/invitation-actions";
+import { WorkspaceInvitationActions } from "@/components/workspace-invitation-actions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -33,10 +33,6 @@ export default async function InvitationsPage() {
     redirect("/login?next=/invitations");
   }
 
-  if (!isSuperAdmin(user)) {
-    await requireRole(supabase, user, "clipper", "/campaigns");
-  }
-
   const { data: inviteRows } = await supabase
     .from("campaign_invites")
     .select("*")
@@ -44,6 +40,7 @@ export default async function InvitationsPage() {
     .order("created_at", { ascending: false });
 
   const invites = inviteRows ?? [];
+  const workspaceInvites = await getPendingWorkspaceInvites(supabase, user);
   const campaignIds = invites.map((invite) => invite.campaign_id);
 
   // The "Invited clippers can view the campaign" policy is what makes this
@@ -79,7 +76,21 @@ export default async function InvitationsPage() {
       </div>
 
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-        {invites.length === 0 && (
+        {workspaceInvites.map((invite) => (
+          <Card key={invite.workspace_id}>
+            <CardHeader>
+              <CardTitle>{invite.workspace.name}</CardTitle>
+              <CardDescription>
+                You&apos;ve been invited to join this workspace as {invite.role}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <WorkspaceInvitationActions workspaceId={invite.workspace_id} />
+            </CardContent>
+          </Card>
+        ))}
+
+        {invites.length === 0 && workspaceInvites.length === 0 && (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">

@@ -25,6 +25,8 @@ const PAGE_TITLES = {
   "/saved": "Saved",
   "/invitations": "Invitations",
   "/notifications": "Notifications",
+  "/workspace/members": "Team",
+  "/workspace": "Workspace",
 }
 
 function getPageTitle(pathname) {

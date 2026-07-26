@@ -107,6 +107,71 @@ begin
           case when n = 0 then 'PASS' else 'FAIL saw '||n end);
 
   ---------------------------------------------------------------------------
+  -- 0b. Workspace membership boundaries.
+  --
+  -- The escalation case is the important one: workspace_members' self-update
+  -- policy has to let an invitee set accepted_at without letting them set their
+  -- own role. RLS cannot restrict columns, so a trigger does it — and a trigger
+  -- is exactly the kind of thing that silently stops working.
+  ---------------------------------------------------------------------------
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.workspace_invites;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('workspaces', 'non-admin CANNOT read workspace invites',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  -- Give the clipper a pending membership, then try to escalate through it.
+  insert into public.workspace_members (workspace_id, user_id, role, accepted_at)
+  values (ws_id, clip_id, 'member', null)
+  on conflict (workspace_id, user_id) do nothing;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    update public.workspace_members set role = 'owner'
+     where workspace_id = ws_id and user_id = clip_id;
+    msg := 'FAIL escalated to owner';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'PASS (' || sqlstate || ')';
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('workspaces', 'invitee CANNOT self-promote to owner', msg);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.campaigns where workspace_id = ws_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('workspaces', 'pending member sees no campaigns',
+          case when n = 0 then 'PASS' else 'FAIL saw '||n end);
+
+  -- The last owner must survive both demotion and removal.
+  --
+  -- Clear the JWT claim first: set_config(..., true) is TRANSACTION-local, so a
+  -- claim set for an earlier check is still in effect here even after
+  -- `reset role`. Leaving it set makes the self-update guard fire instead of
+  -- the last-owner guard, and the check reports a misleading 42501.
+  perform set_config('request.jwt.claims', '', true);
+
+  begin
+    update public.workspace_members set role = 'member'
+     where workspace_id = ws_id and user_id = brand_id;
+    msg := 'FAIL demotion allowed';
+  exception when check_violation then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  insert into rls_results(area, check_name, outcome)
+  values ('workspaces', 'sole owner CANNOT be demoted', msg);
+
+  delete from public.workspace_members where workspace_id = ws_id and user_id = clip_id;
+
+  ---------------------------------------------------------------------------
   -- 1. Recursion guard. Any cycle surfaces here as 42P17.
   --    workspace_members' own policy reads workspace_members, so this is
   --    exactly where a missing SECURITY DEFINER helper shows up.

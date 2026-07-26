@@ -83,11 +83,42 @@ export async function getUserWorkspaces(supabase, user) {
     .map((row) => ({ ...row.workspace, role: row.role }));
 }
 
+// Name of the cookie holding the workspace the user last switched to.
+export const ACTIVE_WORKSPACE_COOKIE = "active_workspace";
+
 /**
- * The workspace to act in. Brands have exactly one until the team UI ships a
- * switcher; this is the single place that assumption lives.
+ * The workspace to act in.
+ *
+ * The cookie is a hint, never an authority: whatever it says is checked against
+ * actual membership, and anything unrecognised falls back to the first
+ * workspace. A client claiming to be in a workspace it does not belong to gets
+ * its own workspace, not that one.
  */
-export async function getActiveWorkspace(supabase, user) {
+export async function getActiveWorkspace(supabase, user, cookieStore = null) {
   const workspaces = await getUserWorkspaces(supabase, user);
-  return workspaces[0] ?? null;
+  if (workspaces.length === 0) return null;
+
+  const requested = cookieStore?.get(ACTIVE_WORKSPACE_COOKIE)?.value;
+  if (requested) {
+    const match = workspaces.find((w) => w.id === requested);
+    if (match) return match;
+  }
+
+  return workspaces[0];
+}
+
+/**
+ * Pending workspace memberships — invited, not yet accepted. Readable by the
+ * invitee because workspace_members' select policy covers their own row.
+ */
+export async function getPendingWorkspaceInvites(supabase, user) {
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("workspace_members")
+    .select("workspace_id, role, created_at, workspace:workspaces(id, name)")
+    .eq("user_id", user.id)
+    .is("accepted_at", null);
+
+  return (data ?? []).filter((row) => row.workspace);
 }

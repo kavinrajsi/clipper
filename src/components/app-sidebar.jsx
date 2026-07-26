@@ -28,6 +28,7 @@ import {
   ShieldIcon,
   BookmarkIcon,
   MailOpenIcon,
+  UsersRoundIcon,
 } from "lucide-react"
 
 const clipperNavMain = [
@@ -93,6 +94,11 @@ const brandNavMain = [
     title: "Brand Profile",
     url: "/brand-profile",
     icon: <Building2Icon />,
+  },
+  {
+    title: "Team",
+    url: "/workspace/members",
+    icon: <UsersRoundIcon />,
   },
 ]
 

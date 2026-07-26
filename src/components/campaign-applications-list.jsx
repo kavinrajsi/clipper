@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -228,6 +229,16 @@ export function CampaignApplicationsList({ applications }) {
               >
                 {application.submission.video_url}
               </a>
+              {/* Timestamped review beats approving or rejecting on a hunch —
+                  it is what collapses a revision round-trip. */}
+              <Button
+                variant="outline"
+                size="sm"
+                nativeButton={false}
+                render={<Link href={`/submissions/${application.submission.id}`} />}
+              >
+                Review
+              </Button>
               {application.submission.status === "submitted" ? (
                 <div className="flex gap-2">
                   <Button

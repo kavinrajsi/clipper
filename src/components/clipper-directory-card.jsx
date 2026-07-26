@@ -1,7 +1,9 @@
+import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatClipperRate } from "@/lib/format"
+import { VerifiedBadge } from "@/components/verified-badge"
+import { formatClipperRate, formatNumber } from "@/lib/format"
 
 function getInitials(name) {
   if (!name) return "?"
@@ -13,20 +15,35 @@ function getInitials(name) {
     .join("");
 }
 
-
-export function ClipperDirectoryCard({ clipperProfile, profile }) {
+// Used by both /clippers (brand-only, shows every profile) and /discover
+// (public, published profiles only). `verification` and `stats` are optional —
+// /clippers doesn't fetch them.
+export function ClipperDirectoryCard({ clipperProfile, profile, verification, stats }) {
   const rate = formatClipperRate(clipperProfile)
+  const name = profile?.full_name ?? "Unnamed clipper"
+  const href = clipperProfile.is_public && clipperProfile.handle
+    ? `/c/${clipperProfile.handle}`
+    : null
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-3">
           <Avatar>
-            <AvatarImage src={profile?.avatar_url} alt={profile?.full_name} />
+            <AvatarImage src={profile?.avatar_url} alt={name} />
             <AvatarFallback>{getInitials(profile?.full_name)}</AvatarFallback>
           </Avatar>
-          <div>
-            <CardTitle>{profile?.full_name ?? "Unnamed clipper"}</CardTitle>
+          <div className="min-w-0">
+            <CardTitle className="flex flex-wrap items-center gap-2">
+              {href ? (
+                <Link href={href} className="hover:underline underline-offset-4">
+                  {name}
+                </Link>
+              ) : (
+                name
+              )}
+              <VerifiedBadge verification={verification} />
+            </CardTitle>
             {clipperProfile.availability_status && (
               <Badge
                 variant={clipperProfile.availability_status === "available" ? "default" : "outline"}
@@ -39,6 +56,16 @@ export function ClipperDirectoryCard({ clipperProfile, profile }) {
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {clipperProfile.headline && (
+          <p className="text-sm font-medium">{clipperProfile.headline}</p>
+        )}
+        {/* Verified delivered performance — omitted entirely rather than shown
+            as zeroes when the creator hasn't synced a channel. */}
+        {stats?.videos_synced > 0 && (
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {formatNumber(stats.verified_views)} verified views · {formatNumber(stats.videos_synced)} clips
+          </p>
+        )}
         {clipperProfile.bio && (
           <p className="line-clamp-3 text-sm text-muted-foreground">{clipperProfile.bio}</p>
         )}

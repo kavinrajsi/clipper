@@ -22,10 +22,18 @@ export async function Header() {
 
   return (
     <header className="flex items-center justify-between border-b px-6 py-4">
-      <Link href="/" className="flex items-center gap-2 font-semibold">
-        <Logo className="size-5" />
-        Clipper
-      </Link>
+      <div className="flex items-center gap-6">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          <Logo className="size-5" />
+          Clipper
+        </Link>
+        <Link
+          href="/discover"
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          Find creators
+        </Link>
+      </div>
       {user ? (
         <UserMenu user={user} profile={profile} />
       ) : (

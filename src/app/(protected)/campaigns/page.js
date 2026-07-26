@@ -30,24 +30,26 @@ export default async function CampaignsPage() {
 
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Campaigns</h1>
-            <p className="text-sm text-muted-foreground">
-              Create and manage campaigns for clippers.
-            </p>
+        <div className="mx-auto w-full max-w-3xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Campaigns</h1>
+              <p className="text-sm text-muted-foreground">
+                Create and manage campaigns for clippers.
+              </p>
+            </div>
+            <CampaignForm brandId={user.id} />
           </div>
-          <CampaignForm brandId={user.id} />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(campaigns ?? []).map((campaign) => (
-            <CampaignCard key={campaign.id} campaign={campaign} role="brand" />
-          ))}
-          {(campaigns ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No campaigns yet — create one to get started.
-            </p>
-          )}
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {(campaigns ?? []).map((campaign) => (
+              <CampaignCard key={campaign.id} campaign={campaign} role="brand" />
+            ))}
+            {(campaigns ?? []).length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No campaigns yet — create one to get started.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -97,26 +99,28 @@ export default async function CampaignsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">Campaigns</h1>
-        <p className="text-sm text-muted-foreground">
-          Browse active campaigns and apply.
-        </p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {campaignsWithBrand.map((campaign) => (
-          <CampaignCard
-            key={campaign.id}
-            campaign={campaign}
-            role="clipper"
-            applicationStatus={applicationByCampaign[campaign.id]}
-          />
-        ))}
-        {(campaigns ?? []).length === 0 && (
+      <div className="mx-auto w-full max-w-3xl">
+        <div>
+          <h1 className="text-2xl font-bold">Campaigns</h1>
           <p className="text-sm text-muted-foreground">
-            No active campaigns right now — check back soon.
+            Browse active campaigns and apply.
           </p>
-        )}
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {campaignsWithBrand.map((campaign) => (
+            <CampaignCard
+              key={campaign.id}
+              campaign={campaign}
+              role="clipper"
+              applicationStatus={applicationByCampaign[campaign.id]}
+            />
+          ))}
+          {(campaigns ?? []).length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No active campaigns right now — check back soon.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

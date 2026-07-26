@@ -510,8 +510,14 @@ begin
           case when n = 2 then 'PASS' else 'FAIL published '||n end);
 
   -- author_name is captured server-side so the review survives the account.
-  select count(*) into n from public.reviews
-   where application_id = app_id and author_name is not null;
+  -- Asserts the trigger COPIED the name, not that it is non-null: full_name is
+  -- nullable on profiles, and a null there must copy through as a null here
+  -- rather than being treated as a trigger failure.
+  select count(*) into n
+    from public.reviews rev
+    join public.profiles pr on pr.id = rev.author_id
+   where rev.application_id = app_id
+     and rev.author_name is not distinct from pr.full_name;
   insert into rls_results(area, check_name, outcome)
   values ('reviews', 'author_name is denormalised at write time',
           case when n = 2 then 'PASS' else 'FAIL '||n||' of 2' end);

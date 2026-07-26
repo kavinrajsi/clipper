@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { CheckCircle2Icon } from "lucide-react"
+import { formatDateTime } from "@/lib/format"
 
 function YoutubeIcon(props) {
   return (
@@ -28,13 +29,6 @@ function YoutubeIcon(props) {
   );
 }
 
-function formatDate(value) {
-  if (!value) return "Never"
-  return new Date(value).toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  })
-}
 
 export function YoutubeConnectorCard({ connection }) {
   const router = useRouter()
@@ -234,7 +228,7 @@ export function YoutubeConnectorCard({ connection }) {
             <div className="text-sm">
               <p className="font-medium">{connection.channel_title}</p>
               <p className="text-muted-foreground">
-                Last synced: {formatDate(connection.last_synced_at)}
+                Last synced: {formatDateTime(connection.last_synced_at, { fallback: "Never" })}
               </p>
             </div>
             <Badge variant="outline" className="ml-auto">

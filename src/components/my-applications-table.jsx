@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { SubmissionForm } from "@/components/submission-form"
+import { formatCampaignRate, formatDate } from "@/lib/format"
 
 const STATUS_VARIANT = {
   pending: "secondary",
@@ -35,13 +36,6 @@ const PAYOUT_STATUS_LABEL = {
   failed: "Failed",
 }
 
-function formatRate(campaign) {
-  const amount = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-  }).format(campaign?.payout_rate ?? 0)
-  return campaign?.payout_structure === "flat_fee" ? `${amount} flat` : `${amount} / 1,000 views`
-}
 
 export function MyApplicationsTable({ applications }) {
   return (
@@ -71,7 +65,7 @@ export function MyApplicationsTable({ applications }) {
                   <TableCell className="font-medium">
                     {application.campaign?.title ?? "Unknown campaign"}
                   </TableCell>
-                  <TableCell>{formatRate(application.campaign)}</TableCell>
+                  <TableCell>{formatCampaignRate(application.campaign)}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[application.status] ?? "outline"}>
                       {application.status}
@@ -107,11 +101,7 @@ export function MyApplicationsTable({ applications }) {
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {new Date(application.created_at).toLocaleDateString("en-IN", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
+                    {formatDate(application.created_at, { style: "medium" })}
                   </TableCell>
                 </TableRow>
               ))

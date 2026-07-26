@@ -7,28 +7,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { formatCurrency, formatDate } from "@/lib/format"
 
 const STATUS_VARIANT = {
   pending: "secondary",
   held: "secondary",
   released: "default",
   failed: "destructive",
-}
-
-function formatAmount(amount) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-  }).format(amount ?? 0)
-}
-
-function formatDate(value) {
-  if (!value) return "—"
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
 }
 
 export function AdminPayoutsTable({ payouts }) {
@@ -59,7 +44,7 @@ export function AdminPayoutsTable({ payouts }) {
                   {payout.clipper_name ?? payout.clipper_email}
                 </TableCell>
                 <TableCell>{payout.campaign_title ?? "—"}</TableCell>
-                <TableCell>{formatAmount(payout.amount)}</TableCell>
+                <TableCell>{formatCurrency(payout.amount ?? 0)}</TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[payout.status] ?? "outline"}>
                     {payout.status}

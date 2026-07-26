@@ -33,6 +33,7 @@ import {
   ChevronsLeftIcon,
   ChevronsRightIcon,
 } from "lucide-react"
+import { formatDate, formatNumber } from "@/lib/format"
 
 function SortableHeader({ column, children, align = "left" }) {
   return (
@@ -68,11 +69,7 @@ const columns = [
     header: ({ column }) => <SortableHeader column={column}>Published</SortableHeader>,
     cell: ({ row }) =>
       row.original.published_at
-        ? new Date(row.original.published_at).toLocaleDateString("en-IN", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })
+        ? formatDate(row.original.published_at, { style: "medium" })
         : "—",
   },
   {
@@ -84,7 +81,7 @@ const columns = [
     ),
     cell: ({ row }) => (
       <div className="text-right tabular-nums">
-        {new Intl.NumberFormat("en-US").format(row.original.view_count ?? 0)}
+        {formatNumber(row.original.view_count)}
       </div>
     ),
   },
@@ -97,7 +94,7 @@ const columns = [
     ),
     cell: ({ row }) => (
       <div className="text-right tabular-nums">
-        {new Intl.NumberFormat("en-US").format(row.original.like_count ?? 0)}
+        {formatNumber(row.original.like_count)}
       </div>
     ),
   },
@@ -110,7 +107,7 @@ const columns = [
     ),
     cell: ({ row }) => (
       <div className="text-right tabular-nums">
-        {new Intl.NumberFormat("en-US").format(row.original.comment_count ?? 0)}
+        {formatNumber(row.original.comment_count)}
       </div>
     ),
   },

@@ -8,6 +8,7 @@ import {
   UploadIcon,
   UserPlusIcon,
 } from "lucide-react"
+import { formatDate } from "@/lib/format"
 
 const TYPE_ICON = {
   upload: UploadIcon,
@@ -18,14 +19,6 @@ const TYPE_ICON = {
   playlistItem: ListPlusIcon,
 }
 
-function formatDate(value) {
-  if (!value) return ""
-  return new Date(value).toLocaleDateString("en-IN", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
 
 export function ActivityFeed({ activities }) {
   return (
@@ -50,7 +43,7 @@ export function ActivityFeed({ activities }) {
                 )}
               </div>
               <span className="shrink-0 text-xs text-muted-foreground">
-                {formatDate(activity.published_at)}
+                {formatDate(activity.published_at, { fallback: "", style: "medium" })}
               </span>
             </div>
           );

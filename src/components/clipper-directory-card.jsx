@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatClipperRate } from "@/lib/format"
 
 function getInitials(name) {
   if (!name) return "?"
@@ -12,21 +13,9 @@ function getInitials(name) {
     .join("");
 }
 
-function formatRate(clipperProfile) {
-  if (!clipperProfile.pricing_model || clipperProfile.rate_amount == null) return null
-  const amount = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-  }).format(clipperProfile.rate_amount)
-  return clipperProfile.pricing_model === "flat_campaign"
-    ? `${amount} flat`
-    : clipperProfile.pricing_model === "cpm"
-      ? `${amount} CPM`
-      : `${amount} / clip`
-}
 
 export function ClipperDirectoryCard({ clipperProfile, profile }) {
-  const rate = formatRate(clipperProfile)
+  const rate = formatClipperRate(clipperProfile)
 
   return (
     <Card>

@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { formatCurrency } from "@/lib/format"
 
 const STATUS_VARIANT = {
   pending: "secondary",
@@ -195,10 +196,7 @@ export function CampaignApplicationsList({ applications }) {
             <div className="flex items-center gap-3 rounded-md bg-muted/50 p-2 pl-4 text-sm">
               <span className="flex-1">
                 Payout:{" "}
-                {new Intl.NumberFormat("en-IN", {
-                  style: "currency",
-                  currency: "INR",
-                }).format(application.payout.amount)}
+                {formatCurrency(application.payout.amount)}
               </span>
               {application.payout.status === "held" ? (
                 <Button

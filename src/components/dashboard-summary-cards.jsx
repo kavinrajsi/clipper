@@ -4,10 +4,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { formatNumber } from "@/lib/format"
 
-function formatNumber(value) {
-  return new Intl.NumberFormat("en-US").format(value ?? 0)
-}
 
 export function DashboardSummaryCards({
   totalViews,

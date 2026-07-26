@@ -38,6 +38,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { CampaignForm } from "@/components/campaign-form"
 import { openCampaignCheckout } from "@/lib/razorpay-checkout"
+import { formatCampaignRate, formatDate } from "@/lib/format"
 
 const STATUS_OPTIONS = [
   { label: "Draft", value: "draft" },
@@ -59,13 +60,6 @@ const APPLICATION_LABEL = {
   rejected: "Rejected",
 }
 
-function formatRate(campaign) {
-  const amount = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-  }).format(campaign.payout_rate ?? 0)
-  return campaign.payout_structure === "flat_fee" ? `${amount} flat` : `${amount} / 1,000 views`
-}
 
 export function CampaignCard({ campaign, role, applicationStatus }) {
   const router = useRouter()
@@ -139,7 +133,7 @@ export function CampaignCard({ campaign, role, applicationStatus }) {
     <Card>
       <CardHeader>
         <CardTitle>{campaign.title}</CardTitle>
-        <CardDescription>{formatRate(campaign)}</CardDescription>
+        <CardDescription>{formatCampaignRate(campaign)}</CardDescription>
         <CardAction>
           <Badge variant={STATUS_VARIANT[campaign.status] ?? "outline"}>
             {campaign.status}
@@ -164,11 +158,7 @@ export function CampaignCard({ campaign, role, applicationStatus }) {
         {campaign.deadline && (
           <p className="text-xs text-muted-foreground">
             Deadline:{" "}
-            {new Date(campaign.deadline).toLocaleDateString("en-IN", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            })}
+            {formatDate(campaign.deadline)}
           </p>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}

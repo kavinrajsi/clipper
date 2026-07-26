@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { formatDate } from "@/lib/format"
 
 export function AnalyticsChart({ title, description, data, dataKey, color = "var(--primary)" }) {
   const chartConfig = {
@@ -42,10 +43,7 @@ export function AnalyticsChart({ title, description, data, dataKey, color = "var
               minTickGap={32}
               tickFormatter={(value) => {
                 if (!value) return ""
-                return new Date(value).toLocaleDateString("en-IN", {
-                  month: "short",
-                  day: "numeric",
-                });
+                return formatDate(value, { fallback: "", style: "short" });
               }}
             />
             <ChartTooltip
@@ -53,10 +51,7 @@ export function AnalyticsChart({ title, description, data, dataKey, color = "var
               content={
                 <ChartTooltipContent
                   labelFormatter={(value) =>
-                    new Date(value).toLocaleDateString("en-IN", {
-                      month: "short",
-                      day: "numeric",
-                    })
+                    formatDate(value, { fallback: "", style: "short" })
                   }
                   indicator="dot"
                 />

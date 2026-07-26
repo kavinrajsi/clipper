@@ -17,29 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { formatCampaignRate, formatCurrency, formatDate } from "@/lib/format"
 
 const STATUS_VARIANT = {
   draft: "secondary",
   active: "default",
   completed: "outline",
   cancelled: "destructive",
-}
-
-function formatRate(campaign) {
-  const amount = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-  }).format(campaign.payout_rate ?? 0)
-  return campaign.payout_structure === "flat_fee" ? `${amount} flat` : `${amount} / 1,000 views`
-}
-
-function formatDate(value) {
-  if (!value) return "—"
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
 }
 
 function DetailRow({ label, children }) {
@@ -83,7 +67,7 @@ export function AdminCampaignsTable({ campaigns }) {
                 >
                   <TableCell className="font-medium">{campaign.title}</TableCell>
                   <TableCell>{campaign.brand_name ?? campaign.brand_email}</TableCell>
-                  <TableCell>{formatRate(campaign)}</TableCell>
+                  <TableCell>{formatCampaignRate(campaign)}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[campaign.status] ?? "outline"}>
                       {campaign.status}
@@ -113,14 +97,8 @@ export function AdminCampaignsTable({ campaigns }) {
                 </Badge>
               </DetailRow>
               <DetailRow label="Funding">{selected.funding_status}</DetailRow>
-              <DetailRow label="Payout">{formatRate(selected)}</DetailRow>
-              <DetailRow label="Budget">
-                {selected.budget != null
-                  ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
-                      selected.budget
-                    )
-                  : "—"}
-              </DetailRow>
+              <DetailRow label="Payout">{formatCampaignRate(selected)}</DetailRow>
+              <DetailRow label="Budget">{formatCurrency(selected.budget)}</DetailRow>
               <DetailRow label="Deadline">{formatDate(selected.deadline)}</DetailRow>
               <DetailRow label="Created">{formatDate(selected.created_at)}</DetailRow>
               <DetailRow label="Applicants">{selected.applicant_count}</DetailRow>

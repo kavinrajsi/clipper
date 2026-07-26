@@ -17,15 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-
-function formatDate(value) {
-  if (!value) return "Never"
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
-}
+import { formatDate, formatNumber } from "@/lib/format"
 
 function DetailRow({ label, children }) {
   return (
@@ -70,9 +62,9 @@ export function AdminClippersTable({ clippers }) {
                   <TableCell>{clipper.email}</TableCell>
                   <TableCell>{clipper.channel_title ?? "Not connected"}</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {new Intl.NumberFormat("en-IN").format(clipper.total_views ?? 0)}
+                    {formatNumber(clipper.total_views)}
                   </TableCell>
-                  <TableCell className="text-right">{formatDate(clipper.last_synced_at)}</TableCell>
+                  <TableCell className="text-right">{formatDate(clipper.last_synced_at, { fallback: "Never" })}</TableCell>
                 </TableRow>
               ))
             )}
@@ -90,9 +82,9 @@ export function AdminClippersTable({ clippers }) {
             <div className="flex flex-col gap-4 px-4">
               <DetailRow label="Channel">{selected.channel_title ?? "Not connected"}</DetailRow>
               <DetailRow label="Total views">
-                {new Intl.NumberFormat("en-IN").format(selected.total_views ?? 0)}
+                {formatNumber(selected.total_views)}
               </DetailRow>
-              <DetailRow label="Last synced">{formatDate(selected.last_synced_at)}</DetailRow>
+              <DetailRow label="Last synced">{formatDate(selected.last_synced_at, { fallback: "Never" })}</DetailRow>
               <DetailRow label="Availability">
                 {selected.availability_status ? (
                   <Badge variant="outline">{selected.availability_status}</Badge>

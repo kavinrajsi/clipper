@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CampaignApplicationsList } from "@/components/campaign-applications-list";
+import { CampaignInvitesManager } from "@/components/campaign-invites-manager";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function CampaignDetailPage({ params }) {
   const { id } = await params;
@@ -74,6 +76,63 @@ export default async function CampaignDetailPage({ params }) {
     payout: payoutByApplication[application.id],
   }));
 
+  // Invites, plus the pool of creators who could be invited. Saved creators
+  // come first — that is what saving them was for.
+  const { data: inviteRows } = await supabase
+    .from("campaign_invites")
+    .select("*")
+    .eq("campaign_id", id)
+    .order("created_at", { ascending: false });
+
+  const { data: savedRows } = await supabase
+    .from("saved_creators")
+    .select("creator_id")
+    .eq("user_id", user.id);
+  const savedIds = new Set((savedRows ?? []).map((row) => row.creator_id));
+
+  const { data: publishedProfiles } = await supabase
+    .from("clipper_profiles")
+    .select("user_id, handle, headline")
+    .eq("is_public", true)
+    .limit(100);
+
+  const creatorIds = [
+    ...new Set([
+      ...(inviteRows ?? []).map((row) => row.clipper_id),
+      ...(publishedProfiles ?? []).map((row) => row.user_id),
+      ...savedIds,
+    ]),
+  ];
+
+  let creatorAccounts = [];
+  if (creatorIds.length > 0) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", creatorIds);
+    creatorAccounts = data ?? [];
+  }
+  const accountById = Object.fromEntries(creatorAccounts.map((a) => [a.id, a]));
+  const publicById = Object.fromEntries((publishedProfiles ?? []).map((p) => [p.user_id, p]));
+
+  const invites = (inviteRows ?? []).map((invite) => ({
+    ...invite,
+    full_name: accountById[invite.clipper_id]?.full_name,
+    avatar_url: accountById[invite.clipper_id]?.avatar_url,
+    handle: publicById[invite.clipper_id]?.handle,
+  }));
+
+  const candidates = (publishedProfiles ?? [])
+    .map((profile) => ({
+      user_id: profile.user_id,
+      handle: profile.handle,
+      headline: profile.headline,
+      full_name: accountById[profile.user_id]?.full_name,
+      avatar_url: accountById[profile.user_id]?.avatar_url,
+      saved: savedIds.has(profile.user_id),
+    }))
+    .sort((a, b) => Number(b.saved) - Number(a.saved));
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div>
@@ -85,10 +144,24 @@ export default async function CampaignDetailPage({ params }) {
           <p className="mt-1 text-sm text-muted-foreground">{campaign.description}</p>
         )}
       </div>
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">Applicants</h2>
-        <CampaignApplicationsList applications={applicationsWithClipper} />
-      </div>
+      <Tabs defaultValue="applicants">
+        <TabsList>
+          <TabsTrigger value="applicants">
+            Applicants ({applicationsWithClipper.length})
+          </TabsTrigger>
+          <TabsTrigger value="invited">Invited ({invites.length})</TabsTrigger>
+        </TabsList>
+        <TabsContent value="applicants" className="mt-4">
+          <CampaignApplicationsList applications={applicationsWithClipper} />
+        </TabsContent>
+        <TabsContent value="invited" className="mt-4">
+          <CampaignInvitesManager
+            campaign={campaign}
+            invites={invites}
+            candidates={candidates}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

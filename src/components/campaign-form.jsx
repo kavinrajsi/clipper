@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -34,6 +34,24 @@ const PAYOUT_STRUCTURES = [
   { label: "Flat campaign fee", value: "flat_fee" },
 ]
 
+const VISIBILITY_OPTIONS = [
+  {
+    value: "public",
+    label: "Anyone",
+    description: "Listed for every clipper once the campaign is funded and active.",
+  },
+  {
+    value: "invite_only",
+    label: "Invite only",
+    description: "Unlisted. Only clippers you invite can see it or apply.",
+  },
+  {
+    value: "private",
+    label: "Private",
+    description: "Unlisted, and not accepting new applicants.",
+  },
+]
+
 export function CampaignForm({ brandId, campaign }) {
   const isEditing = Boolean(campaign)
   const financialFieldsLocked = isEditing && campaign.funding_status !== "unfunded"
@@ -48,6 +66,7 @@ export function CampaignForm({ brandId, campaign }) {
   const [payoutRate, setPayoutRate] = useState(campaign?.payout_rate ?? "")
   const [budget, setBudget] = useState(campaign?.budget ?? "")
   const [deadline, setDeadline] = useState(campaign?.deadline ?? "")
+  const [visibility, setVisibility] = useState(campaign?.visibility ?? "public")
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -59,6 +78,7 @@ export function CampaignForm({ brandId, campaign }) {
     setPayoutRate(campaign?.payout_rate ?? "")
     setBudget(campaign?.budget ?? "")
     setDeadline(campaign?.deadline ?? "")
+    setVisibility(campaign?.visibility ?? "public")
     setError(null)
   }
 
@@ -72,6 +92,7 @@ export function CampaignForm({ brandId, campaign }) {
       description: description || null,
       requirements: requirements || null,
       deadline: deadline || null,
+      visibility,
       ...(financialFieldsLocked
         ? {}
         : {
@@ -256,6 +277,26 @@ export function CampaignForm({ brandId, campaign }) {
                 />
               </Field>
             </div>
+            <Field>
+              <FieldLabel htmlFor="visibility">Who can see this</FieldLabel>
+              <Select value={visibility} onValueChange={setVisibility}>
+                <SelectTrigger id="visibility">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {VISIBILITY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                {VISIBILITY_OPTIONS.find((o) => o.value === visibility)?.description}
+              </FieldDescription>
+            </Field>
           </FieldGroup>
           <DialogFooter className="mt-6">
             <Button type="submit" disabled={loading}>

@@ -13,6 +13,7 @@ const PROTECTED_PATH_PREFIXES = [
   "/brand-profile",
   "/clippers",
   "/saved",
+  "/invitations",
 ];
 
 export async function updateSession(request) {

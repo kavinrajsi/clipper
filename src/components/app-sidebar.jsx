@@ -27,6 +27,7 @@ import {
   UsersIcon,
   ShieldIcon,
   BookmarkIcon,
+  MailOpenIcon,
 } from "lucide-react"
 
 const clipperNavMain = [
@@ -54,6 +55,11 @@ const clipperNavMain = [
     title: "Campaigns",
     url: "/campaigns",
     icon: <MegaphoneIcon />,
+  },
+  {
+    title: "Invitations",
+    url: "/invitations",
+    icon: <MailOpenIcon />,
   },
   {
     title: "Saved",

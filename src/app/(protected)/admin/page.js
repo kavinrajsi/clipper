@@ -49,7 +49,9 @@ export default async function AdminPage() {
     admin.from("campaign_applications").select("id, campaign_id"),
     admin
       .from("campaign_payouts")
-      .select("id, application_id, clipper_id, amount, status, held_at, released_at, created_at"),
+      .select(
+        "id, application_id, clipper_id, amount, platform_fee_amount, status, held_at, released_at, created_at"
+      ),
   ]);
 
   const emailById = Object.fromEntries(

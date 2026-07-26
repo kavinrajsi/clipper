@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { platformFee, totalChargedToBrand } from "@/lib/commission";
 import { createHeldTransfer } from "@/lib/razorpay";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -86,6 +87,22 @@ export async function POST(request, { params }) {
 
   amount = Math.round(amount * payoutMultiplier * 100) / 100;
 
+  // A campaign with no payout_rate and an application with no bid makes this
+  // NaN, and every downstream comparison against it silently succeeds — the
+  // budget check included. Fail here instead of transferring a NaN.
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return NextResponse.json(
+      { error: "This campaign has no payout rate set, so there's nothing to pay out." },
+      { status: 400 }
+    );
+  }
+
+  // The creator's amount is never reduced by the fee — the brand pays it on
+  // top. So the budget has to cover both, and `amount` below stays the number
+  // that goes to Razorpay.
+  const platformFeeAmount = platformFee(amount);
+  const chargedToBrand = totalChargedToBrand(amount);
+
   if (campaign.budget) {
     const { data: campaignApplications } = await admin
       .from("campaign_applications")
@@ -96,17 +113,23 @@ export async function POST(request, { params }) {
 
     const { data: existingPayouts } = await admin
       .from("campaign_payouts")
-      .select("amount, status")
+      .select("amount, platform_fee_amount, status")
       .in("application_id", applicationIds);
 
+    // Historical fees count towards the budget too. Summing `amount` alone
+    // would under-count committed spend and over-admit every later payout, so
+    // the campaign could overrun by the accumulated fee.
     const committed = (existingPayouts ?? [])
       .filter((payout) => payout.status !== "failed")
-      .reduce((sum, payout) => sum + Number(payout.amount), 0);
+      .reduce(
+        (sum, payout) => sum + Number(payout.amount) + Number(payout.platform_fee_amount ?? 0),
+        0
+      );
 
-    if (committed + amount > campaign.budget) {
+    if (committed + chargedToBrand > campaign.budget) {
       return NextResponse.json(
         {
-          error: `This payout would exceed the campaign's funded budget. ₹${committed.toFixed(2)} already committed of ₹${campaign.budget}.`,
+          error: `This payout would exceed the campaign's funded budget. ₹${committed.toFixed(2)} already committed of ₹${campaign.budget}, and this one costs ₹${chargedToBrand.toFixed(2)} including the ₹${platformFeeAmount.toFixed(2)} platform fee.`,
         },
         { status: 400 }
       );
@@ -119,6 +142,8 @@ export async function POST(request, { params }) {
     .eq("id", id);
 
   try {
+    // Transfers the creator's amount only. The fee is realised by staying
+    // behind in the platform's Razorpay account, not by a second transfer.
     const transfer = await createHeldTransfer(
       campaign.razorpay_payment_id,
       payoutAccount.razorpay_account_id,
@@ -130,6 +155,7 @@ export async function POST(request, { params }) {
         application_id: submission.application_id,
         clipper_id: submission.clipper_id,
         amount,
+        platform_fee_amount: platformFeeAmount,
         razorpay_transfer_id: transfer.id,
         status: "held",
         held_at: new Date().toISOString(),
@@ -143,11 +169,15 @@ export async function POST(request, { params }) {
   } catch (err) {
     console.error("Razorpay transfer creation failed", err);
 
+    // Records the fee that would have been charged. A failed row with the fee
+    // silently missing would make the audit trail asymmetric — and this row is
+    // excluded from the committed sum anyway, so it costs the brand nothing.
     await admin.from("campaign_payouts").upsert(
       {
         application_id: submission.application_id,
         clipper_id: submission.clipper_id,
         amount,
+        platform_fee_amount: platformFeeAmount,
         status: "failed",
       },
       { onConflict: "application_id" }

@@ -25,6 +25,7 @@ const PAGE_TITLES = {
   "/saved": "Saved",
   "/invitations": "Invitations",
   "/notifications": "Notifications",
+  "/messages": "Messages",
   "/workspace/members": "Team",
   "/workspace": "Workspace",
 }

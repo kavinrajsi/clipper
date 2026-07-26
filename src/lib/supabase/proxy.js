@@ -17,6 +17,7 @@ const PROTECTED_PATH_PREFIXES = [
   "/notifications",
   "/workspace",
   "/reviews",
+  "/messages",
 ];
 
 export async function updateSession(request) {

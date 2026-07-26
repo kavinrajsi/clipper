@@ -87,6 +87,33 @@ export async function POST(request, { params }) {
 
   amount = Math.round(amount * payoutMultiplier * 100) / 100;
 
+  // Approval threshold, checked BEFORE any Razorpay call and never on the
+  // client. Only applies once a workspace has set a policy; without one the
+  // helper returns false for a missing row, so treat "no policy" as no gate.
+  const { data: policy } = await admin
+    .from("approval_policies")
+    .select("submission_approvals_required")
+    .eq("workspace_id", campaign.workspace_id)
+    .maybeSingle();
+
+  if (policy && policy.submission_approvals_required > 1) {
+    const { data: cleared } = await admin.rpc("has_required_approvals", {
+      ws: campaign.workspace_id,
+      p_subject_type: "submission",
+      p_subject_id: id,
+      p_amount: amount,
+    });
+
+    if (!cleared) {
+      return NextResponse.json(
+        {
+          error: `This workspace requires ${policy.submission_approvals_required} approvals before a payout is created. Ask a teammate to approve it too.`,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   // A campaign with no payout_rate and an application with no bid makes this
   // NaN, and every downstream comparison against it silently succeeds — the
   // budget check included. Fail here instead of transferring a NaN.

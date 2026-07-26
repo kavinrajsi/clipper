@@ -52,7 +52,7 @@ const VISIBILITY_OPTIONS = [
   },
 ]
 
-export function CampaignForm({ brandId, campaign, workspaceId }) {
+export function CampaignForm({ brandId, campaign, workspaceId, templates = [] }) {
   const isEditing = Boolean(campaign)
   const financialFieldsLocked = isEditing && campaign.funding_status !== "unfunded"
 
@@ -67,8 +67,24 @@ export function CampaignForm({ brandId, campaign, workspaceId }) {
   const [budget, setBudget] = useState(campaign?.budget ?? "")
   const [deadline, setDeadline] = useState(campaign?.deadline ?? "")
   const [visibility, setVisibility] = useState(campaign?.visibility ?? "public")
+  const [templateId, setTemplateId] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  function applyTemplate(id) {
+    const template = templates.find((t) => t.id === id)
+    if (!template) return
+    setTemplateId(id)
+
+    // Creative fields only. A template never carries budget or funding state —
+    // pre-filling money is a mis-click waiting to happen.
+    const payload = template.payload ?? {}
+    if (payload.requirements) setRequirements(payload.requirements)
+    if (payload.description) setDescription(payload.description)
+    if (payload.payout_structure && !financialFieldsLocked) {
+      setPayoutStructure(payload.payout_structure)
+    }
+  }
 
   function resetForm() {
     setTitle(campaign?.title ?? "")
@@ -79,6 +95,7 @@ export function CampaignForm({ brandId, campaign, workspaceId }) {
     setBudget(campaign?.budget ?? "")
     setDeadline(campaign?.deadline ?? "")
     setVisibility(campaign?.visibility ?? "public")
+    setTemplateId(null)
     setError(null)
   }
 
@@ -93,6 +110,9 @@ export function CampaignForm({ brandId, campaign, workspaceId }) {
       requirements: requirements || null,
       deadline: deadline || null,
       visibility,
+      // Create only. On edit templateId is null, so including it here would
+      // wipe the attribution of a campaign that was created from a template.
+      ...(isEditing ? {} : { template_id: templateId }),
       ...(financialFieldsLocked
         ? {}
         : {
@@ -185,6 +205,27 @@ export function CampaignForm({ brandId, campaign, workspaceId }) {
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            )}
+            {!isEditing && templates.length > 0 && (
+              <Field>
+                <FieldLabel htmlFor="template">Start from a template</FieldLabel>
+                <Select value={templateId ?? ""} onValueChange={applyTemplate}>
+                  <SelectTrigger id="template">
+                    <SelectValue placeholder="Blank campaign" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  Fills the brief and payout structure. Budget and deadline are always yours to
+                  set.
+                </FieldDescription>
+              </Field>
             )}
             <Field>
               <FieldLabel htmlFor="title">Title</FieldLabel>

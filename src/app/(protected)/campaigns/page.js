@@ -25,6 +25,14 @@ export default async function CampaignsPage() {
   if (role === "brand") {
     const workspace = await getActiveWorkspace(supabase, user);
 
+    // Starters plus this workspace's own. RLS returns platform templates to
+    // everyone and workspace ones only to members.
+    const { data: templates } = await supabase
+      .from("campaign_templates")
+      .select("id, name, description, payload, is_platform_template")
+      .order("is_platform_template", { ascending: true })
+      .order("name", { ascending: true });
+
     const { data: campaigns } = workspace
       ? await supabase
           .from("campaigns")
@@ -43,7 +51,11 @@ export default async function CampaignsPage() {
                 Create and manage campaigns for clippers.
               </p>
             </div>
-            <CampaignForm brandId={user.id} workspaceId={workspace?.id} />
+            <CampaignForm
+            brandId={user.id}
+            workspaceId={workspace?.id}
+            templates={templates ?? []}
+          />
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             {(campaigns ?? []).map((campaign) => (

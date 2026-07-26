@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/format";
+import { extractYoutubeVideoId } from "@/lib/youtube";
 import { SubmissionReview } from "@/components/submission-review";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,7 @@ export default async function SubmissionReviewPage({ params }) {
       <div className="mx-auto w-full max-w-5xl">
         <SubmissionReview
           submission={submission}
+          videoId={extractYoutubeVideoId(submission.video_url)}
           annotations={annotations}
           viewerId={user.id}
           people={people}

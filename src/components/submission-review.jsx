@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckIcon, MessageSquarePlusIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { extractYoutubeVideoId } from "@/lib/youtube";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -75,10 +74,13 @@ function useYouTubePlayer(videoId, containerId) {
   };
 }
 
-export function SubmissionReview({ submission, annotations: initial, viewerId, people }) {
+// videoId is resolved on the server and passed in. Importing @/lib/youtube
+// here would bundle its OAuth helpers into the browser — the secrets are not
+// inlined (Next only inlines NEXT_PUBLIC_*), but shipping dead server code to
+// the client is not a habit worth starting.
+export function SubmissionReview({ submission, videoId, annotations: initial, viewerId, people }) {
   const supabase = createClient();
   const router = useRouter();
-  const videoId = extractYoutubeVideoId(submission.video_url);
   const containerId = `yt-${submission.id}`;
   const player = useYouTubePlayer(videoId, containerId);
 

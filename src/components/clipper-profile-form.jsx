@@ -7,12 +7,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Field,
+  FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldLegend,
   FieldSeparator,
   FieldSet,
 } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -59,6 +61,11 @@ const AVAILABILITY_OPTIONS = [
 
 export function ClipperProfileForm({ userId, clipperProfile, className, ...props }) {
   const supabase = createClient()
+  const [handle, setHandle] = useState(clipperProfile?.handle ?? "")
+  const [headline, setHeadline] = useState(clipperProfile?.headline ?? "")
+  const [location, setLocation] = useState(clipperProfile?.location ?? "")
+  const [languages, setLanguages] = useState((clipperProfile?.languages ?? []).join(", "))
+  const [isPublic, setIsPublic] = useState(clipperProfile?.is_public ?? false)
   const [bio, setBio] = useState(clipperProfile?.bio ?? "")
   const [categories, setCategories] = useState(clipperProfile?.categories ?? [])
   const [styleTags, setStyleTags] = useState(clipperProfile?.style_tags ?? [])
@@ -70,13 +77,32 @@ export function ClipperProfileForm({ userId, clipperProfile, className, ...props
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  const normalisedHandle = handle.trim().toLowerCase()
+
   async function handleSubmit(event) {
     event.preventDefault()
     setError(null)
+
+    // Publishing without a handle violates a database check constraint, so
+    // catch it here with a message that says what to do about it.
+    if (isPublic && !normalisedHandle) {
+      setError("Pick a handle before making your profile public.")
+      return
+    }
+
     setLoading(true)
 
     const { error: upsertError } = await supabase.from("clipper_profiles").upsert({
       user_id: userId,
+      handle: normalisedHandle || null,
+      headline: headline || null,
+      location: location || null,
+      languages: languages
+        .split(",")
+        .map((l) => l.trim())
+        .filter(Boolean),
+      is_public: isPublic,
+      published_at: isPublic ? (clipperProfile?.published_at ?? new Date().toISOString()) : null,
       bio,
       categories,
       style_tags: styleTags,
@@ -87,13 +113,26 @@ export function ClipperProfileForm({ userId, clipperProfile, className, ...props
     })
 
     if (upsertError) {
-      setError(upsertError.message)
+      // The unique index, format check and reserved-handle trigger all surface
+      // as raw Postgres errors. Translate the ones a user can act on.
+      const message = upsertError.message ?? ""
+      if (message.includes("clipper_profiles_handle_key")) {
+        setError("That handle is taken. Try another.")
+      } else if (message.includes("clipper_profiles_handle_format")) {
+        setError(
+          "Handles are 3–30 characters: lowercase letters, numbers, hyphens and underscores, starting with a letter or number."
+        )
+      } else if (message.includes("is reserved")) {
+        setError(`"${normalisedHandle}" is reserved. Try another.`)
+      } else {
+        setError(message)
+      }
       setLoading(false)
       return
     }
 
     setLoading(false)
-    toast.success("Clipper profile saved.")
+    toast.success(isPublic ? "Profile saved and published." : "Clipper profile saved.")
   }
 
   return (
@@ -104,6 +143,73 @@ export function ClipperProfileForm({ userId, clipperProfile, className, ...props
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        <FieldSet>
+          <FieldLegend>Public profile</FieldLegend>
+          <Field>
+            <FieldLabel htmlFor="handle">Handle</FieldLabel>
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-sm text-muted-foreground">/c/</span>
+              <Input
+                id="handle"
+                value={handle}
+                onChange={(event) => setHandle(event.target.value)}
+                placeholder="jordan-reyes"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </div>
+            <FieldDescription>
+              {normalisedHandle
+                ? `Your profile will live at /c/${normalisedHandle}`
+                : "Lowercase letters, numbers, hyphens and underscores. 3–30 characters."}
+            </FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="headline">Headline</FieldLabel>
+            <Input
+              id="headline"
+              value={headline}
+              onChange={(event) => setHeadline(event.target.value)}
+              placeholder="Podcast clips that actually get watched"
+              maxLength={120}
+            />
+          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="location">Location</FieldLabel>
+              <Input
+                id="location"
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                placeholder="Bengaluru, India"
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="languages">Languages</FieldLabel>
+              <Input
+                id="languages"
+                value={languages}
+                onChange={(event) => setLanguages(event.target.value)}
+                placeholder="English, Hindi"
+              />
+              <FieldDescription>Comma separated.</FieldDescription>
+            </Field>
+          </div>
+          <Field orientation="horizontal">
+            <Switch id="is-public" checked={isPublic} onCheckedChange={setIsPublic} />
+            <div className="flex flex-col gap-1">
+              <FieldLabel htmlFor="is-public">Make my profile public</FieldLabel>
+              <FieldDescription>
+                Anyone can view it, and brands can find you in search. Turn this off to hide it
+                again at any time.
+              </FieldDescription>
+            </div>
+          </Field>
+        </FieldSet>
+
+        <FieldSeparator />
 
         <FieldSet>
           <FieldLegend>About you</FieldLegend>

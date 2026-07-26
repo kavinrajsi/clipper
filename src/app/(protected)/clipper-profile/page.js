@@ -37,6 +37,17 @@ export default async function ClipperProfilePage() {
           </Link>
           .
         </p>
+        {clipperProfile?.is_public && clipperProfile?.handle && (
+          <p className="mt-2 text-sm">
+            Live at{" "}
+            <Link
+              href={`/c/${clipperProfile.handle}`}
+              className="font-medium underline underline-offset-4"
+            >
+              /c/{clipperProfile.handle}
+            </Link>
+          </p>
+        )}
       </div>
       <ClipperProfileForm
         userId={user.id}

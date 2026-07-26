@@ -2,6 +2,27 @@
 
 Standing up a local Supabase stack.
 
+> ## ⚠ `npm run dev` points at LOCAL, not the live project
+>
+> Both env files set `NEXT_PUBLIC_SUPABASE_URL`:
+>
+> | File | Value |
+> |---|---|
+> | `.env.local` | `https://nfeuykwnqqtdecwucujo.supabase.co` (live) |
+> | `.env.development.local` | `http://127.0.0.1:54321` (local stack) |
+>
+> **Next.js gives `.env.development.local` precedence in development**, so `npm run dev` always talks to the local stack. If OrbStack isn't running and `supabase start` hasn't been run, the app has **no database at all** — every page that reads data silently renders empty or 404s, with no error to explain why. Static pages still work, which makes it look like the app is fine.
+>
+> Symptom: a page that should show data returns 404, and a direct `curl` to `127.0.0.1:54321` gives `Connection refused`.
+>
+> Either start the local stack (below), or run against live for one session without editing any file — real shell env vars beat `.env` files:
+>
+> ```bash
+> set -a; . ./.env.local; set +a; npm run dev
+> ```
+>
+> **A local stack needs the migrations applied too.** `supabase/migrations/` is committed, so `supabase db reset` (or `supabase start` on a fresh volume) replays them. Schema changes pushed straight to the live project via the dashboard or MCP will not be in local until you also add the migration file — which is why every schema change should land as a file in `supabase/migrations/`.
+
 > **Updated 2026-07-26:** `supabase/` now exists and is committed — `supabase/config.toml` plus two migrations in `supabase/migrations/`. The live project (ref `nfeuykwnqqtdecwucujo`, name "Clipping") is no longer the only source of truth for the schema. The `supabase init` / `db pull` steps below are therefore first-time-setup history; if you're cloning fresh, you only need `supabase link` and `supabase start`.
 
 ## Prerequisites

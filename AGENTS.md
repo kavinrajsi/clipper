@@ -48,7 +48,7 @@ Flow: brand creates a campaign → funds the full budget via Razorpay Checkout (
 
 ### ⚠ Route is NOT enabled on the Razorpay account — the payout half cannot run
 
-Probed directly with the test keys in `.env.local` on 2026-07-26. **The keys are real and auth succeeds** — an earlier version of this file claimed every call 401s on placeholder keys, which is wrong. What actually fails is the Route product:
+Probed directly with the test keys in `.env.local` on 2026-07-26 (`npm run razorpay:probe` — re-run it after support enables Route). **The keys are real and auth succeeds** — an earlier version of this file claimed every call 401s on placeholder keys, which is wrong. What actually fails is the Route product:
 
 | Endpoint | Result |
 |---|---|

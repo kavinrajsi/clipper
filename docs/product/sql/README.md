@@ -46,6 +46,15 @@ RLS is force-enabled on new public tables by the existing `rls_auto_enable()` ev
 
 Re-run the steps below once Razorpay support has enabled Route, to answer the questions the docs leave open. Each is a distinct pass/fail.
 
+Run the committed probe first — it reports which Razorpay products are enabled:
+
+```bash
+npm run razorpay:probe
+```
+
+It reads test keys from `.env.local`, refuses to run against a live key, and
+creates nothing. Then work through the individual questions below.
+
 Set up once (test-mode keys only — never live):
 
 ```bash

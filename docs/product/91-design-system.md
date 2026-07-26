@@ -106,7 +106,9 @@ The in-button `<Spinner/>` convention is good and consistent across 10 files —
 | Inline `Intl.NumberFormat` | ~9 | Bypass even the local helpers |
 | Inline `toLocaleDateString` | ~5 | |
 
-There's also a **locale inconsistency**: currency and counts are `en-IN` on campaign and admin surfaces but `en-US` in analytics (`dashboard-summary-cards.jsx:9`, `analytics-summary-cards.jsx:9`, `video-analytics-table.jsx`). Given the product formats dates day-first and prices in INR throughout, `en-IN` is correct everywhere and the analytics surfaces are the bug.
+There was also a **locale split** — and it's narrower than it first looked. Verified: **currency is `en-IN` in all six call sites already.** The only inconsistency was on raw view/engagement counts: `en-US` in `dashboard-summary-cards`, `analytics-summary-cards`, and `video-analytics-table`, versus `en-IN` in `admin-clippers-table`.
+
+The resolution is the opposite of what this doc originally claimed. `en-IN` renders a view count as `4,20,000` (lakh grouping); YouTube and every analytics tool render `420,000`. **The analytics surfaces were right and `admin-clippers-table` was the outlier.** So: money and dates `en-IN`, counts `en-US` grouping.
 
 ```js
 // src/lib/format.js
@@ -162,6 +164,9 @@ Words are interface, not decoration. The existing copy is decent; these keep it 
 ---
 
 ## Phase 1 checklist
+
+> **Status:** items 1–3 and 5 are done (commits `bde9ed0`, `d6f5f7e`). `lib/format.js` exists, `ThemeProvider` is mounted, `ui/toast.jsx` is deleted, `<Toaster/>` is at the root, and the four sticky success alerts are toasts. Remaining: `ui/empty.jsx` adoption, skeletons + `loading.js`/`error.js`, `not-found.js`, and the command palette.
+
 
 Ordered by value per hour. All of it is wiring existing code.
 

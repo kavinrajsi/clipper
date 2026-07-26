@@ -106,4 +106,17 @@ echo "── RazorpayX Payouts (fallback path only) ─────────�
 probe "GET  /v1/payouts"             GET  "$API/v1/payouts?count=1"
 
 echo
+echo "── Reading this ───────────────────────────────────────────────────"
+echo "   Route and Direct Transfers are SEPARATE on-demand features."
+echo "   Route can land without Direct Transfers."
+echo
+echo "   /v2/accounts + /v1/transfers (GET) go reachable"
+echo "     → Route enabled. Existing payout code (createLinkedAccount,"
+echo "       createHeldTransfer) can run."
+echo "   POST /v1/transfers goes reachable"
+echo "     → Direct Transfers enabled. Wallet model unblocked."
+echo
+echo "   If only the first two flip, that is a SECOND support request,"
+echo "   not a bug. Ask Razorpay to enable Direct Transfers explicitly."
+echo
 echo "Reference: docs/product/08-monetisation.md, docs/product/sql/README.md"

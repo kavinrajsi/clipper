@@ -66,7 +66,14 @@ Consequences for anyone working in this area:
 - **Refunds DO work** — core API, unaffected. Partial refunds are supported and multiple partials are allowed as long as the sum stays within the captured amount. This is currently the only working way to move money back out of the platform account.
 - **RazorpayX Payouts is also unavailable**, but note the different error shape: Route returns "URL not found" (product not routed), RazorpayX returns "Access to requested resource not available" (endpoint exists, not authorised).
 
-Fixing this is a support request to Razorpay to enable Route on test + live, not a code change. Direct Transfers (`POST /v1/transfers`) is *separately* on-demand and should be asked for in the same request — see `docs/product/08-monetisation.md`.
+Fixing this is a support request to Razorpay to enable Route on test + live, not a code change.
+
+**Route and Direct Transfers are separate on-demand features, and Route can land without Direct Transfers.** When re-running the probe, read the two independently:
+
+- `/v2/accounts` and `GET /v1/transfers` reachable → **Route enabled.** The existing payout code (`createLinkedAccount`, `createHeldTransfer`) can run.
+- `POST /v1/transfers` reachable → **Direct Transfers enabled.** The wallet model in `docs/product/08-monetisation.md` is unblocked.
+
+If only the first pair flips, that is a **second support request, not a bug** — ask for Direct Transfers explicitly. Asking for both in the original ticket avoids the round trip.
 
 ## Schema reference (live project, not local files — see below)
 

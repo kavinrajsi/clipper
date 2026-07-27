@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceRole } from "@/lib/workspaces";
 import { CampaignApplicationsList } from "@/components/campaign-applications-list";
 import { CampaignInvitesManager } from "@/components/campaign-invites-manager";
+import { CampaignMilestonesManager } from "@/components/campaign-milestones-manager";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -157,6 +158,29 @@ export default async function CampaignDetailPage({ params }) {
     handle: publicById[invite.clipper_id]?.handle,
   }));
 
+  const { data: milestoneRows } = await supabase
+    .from("campaign_milestones")
+    .select("*")
+    .eq("campaign_id", id)
+    .order("position", { ascending: true });
+
+  const milestones = milestoneRows ?? [];
+
+  // campaign_payouts has no campaign_id, so scope by milestone. Without the
+  // `in` filter this reads every milestone payout the viewer can see, across
+  // every campaign, and grows with the account.
+  let milestonePayouts = [];
+  if (milestones.length > 0) {
+    const { data } = await supabase
+      .from("campaign_payouts")
+      .select("id, milestone_id, status")
+      .in(
+        "milestone_id",
+        milestones.map((m) => m.id)
+      );
+    milestonePayouts = data ?? [];
+  }
+
   const candidates = (publishedProfiles ?? [])
     .map((profile) => ({
       user_id: profile.user_id,
@@ -185,6 +209,9 @@ export default async function CampaignDetailPage({ params }) {
             Applicants ({applicationsWithClipper.length})
           </TabsTrigger>
           <TabsTrigger value="invited">Invited ({invites.length})</TabsTrigger>
+          <TabsTrigger value="milestones">
+            Milestones ({milestones.length})
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="applicants" className="mt-4">
           <CampaignApplicationsList applications={applicationsWithClipper} />
@@ -194,6 +221,14 @@ export default async function CampaignDetailPage({ params }) {
             campaign={campaign}
             invites={invites}
             candidates={candidates}
+          />
+        </TabsContent>
+        <TabsContent value="milestones" className="mt-4">
+          <CampaignMilestonesManager
+            campaign={campaign}
+            milestones={milestones}
+            payouts={milestonePayouts}
+            canManage={Boolean(workspaceRole)}
           />
         </TabsContent>
       </Tabs>

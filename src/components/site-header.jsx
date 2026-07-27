@@ -28,6 +28,7 @@ const PAGE_TITLES = {
   "/messages": "Messages",
   "/workspace/members": "Team",
   "/workspace/assets": "Brand assets",
+  "/workspace/settings": "Workspace",
   "/workspace": "Workspace",
 }
 

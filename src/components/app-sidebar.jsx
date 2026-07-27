@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 
 import { NavMain } from "@/components/nav-main"
+import { WorkspaceSwitcher } from "@/components/workspace-switcher"
 import { NavUser } from "@/components/nav-user"
 import { Logo } from "@/components/logo"
 import {
@@ -32,6 +33,7 @@ import {
   MessagesSquareIcon,
   UsersRoundIcon,
   PaperclipIcon,
+  SettingsIcon,
 } from "lucide-react"
 
 const clipperNavMain = [
@@ -128,9 +130,14 @@ const brandNavMain = [
     url: "/workspace/members",
     icon: <UsersRoundIcon />,
   },
+  {
+    title: "Workspace",
+    url: "/workspace/settings",
+    icon: <SettingsIcon />,
+  },
 ]
 
-export function AppSidebar({ user, profile, isAdmin, ...props }) {
+export function AppSidebar({ user, profile, isAdmin, workspaces = [], activeWorkspaceId, ...props }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const isBrand = profile?.role === "brand"
   const baseNavMain = isBrand ? brandNavMain : clipperNavMain
@@ -153,6 +160,8 @@ export function AppSidebar({ user, profile, isAdmin, ...props }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        {/* Only renders when there is more than one workspace to switch to. */}
+        <WorkspaceSwitcher workspaces={workspaces} activeId={activeWorkspaceId} />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />

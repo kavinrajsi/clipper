@@ -49,6 +49,8 @@ declare
   msg       text;
   app_id    uuid;
   pay_id    uuid;
+  subj_id   uuid;
+  had_policy boolean;
 
   procedure_note text;
 begin
@@ -533,6 +535,165 @@ begin
   insert into rls_results(area, check_name, outcome)
   values ('reviews', 'a published review CANNOT be edited',
           case when n = 0 then 'PASS' else 'FAIL updated '||n end);
+
+  -- ---------------------------------------------------------------------
+  -- APPROVALS
+  --
+  -- The whole point of a multi-approval policy is that ONE person cannot
+  -- satisfy it. That guarantee lives in a unique constraint and two policies,
+  -- and nothing else checks it — the route only counts rows.
+  --
+  -- subject_id has no FK, so a synthetic uuid is a faithful subject here: the
+  -- policies key off workspace_id, never off the subject row.
+  -- ---------------------------------------------------------------------
+  perform set_config('request.jwt.claims', '', true);
+  subj_id := gen_random_uuid();
+
+  -- A second member, so a 2-approval policy is satisfiable at all.
+  insert into public.workspace_members (workspace_id, user_id, role, accepted_at)
+  values (ws_id, clip_id, 'member', now())
+  on conflict (workspace_id, user_id) do update set accepted_at = now();
+
+  select exists(select 1 from public.approval_policies where workspace_id = ws_id)
+    into had_policy;
+  insert into public.approval_policies (workspace_id, submission_approvals_required)
+  values (ws_id, 2)
+  on conflict (workspace_id) do update set submission_approvals_required = 2;
+
+  -- The brand approves as themselves.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.approvals (workspace_id, subject_type, subject_id, approver_id, decision)
+    values (ws_id, 'submission', subj_id, brand_id, 'approved');
+    msg := 'PASS';
+  exception when others then msg := 'FAIL ' || sqlstate || ' ' || left(sqlerrm, 60);
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'a workspace member CAN record their own approval', msg);
+
+  -- Approving twice is the obvious way to fake a second signature.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.approvals (workspace_id, subject_type, subject_id, approver_id, decision)
+    values (ws_id, 'submission', subj_id, brand_id, 'approved');
+    msg := 'FAIL second approval by the same person was accepted';
+  exception when unique_violation then msg := 'PASS';
+       when others then msg := 'FAIL ' || sqlstate || ' ' || left(sqlerrm, 60);
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'the same person CANNOT approve twice', msg);
+
+  -- Signing someone else's name is the less obvious way.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.approvals (workspace_id, subject_type, subject_id, approver_id, decision)
+    values (ws_id, 'submission', subj_id, clip_id, 'approved');
+    msg := 'FAIL approved on another user''s behalf';
+  exception when others then msg := 'PASS';
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'a member CANNOT approve as someone else', msg);
+
+  -- One of two: the gate must still be shut.
+  perform set_config('request.jwt.claims', '', true);
+  ok := public.has_required_approvals(ws_id, 'submission', subj_id, 5000);
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', '1 of 2 approvals does NOT clear the gate',
+          case when ok is not true then 'PASS' else 'FAIL gate opened early' end);
+
+  -- The second member signs; now it opens.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  insert into public.approvals (workspace_id, subject_type, subject_id, approver_id, decision)
+  values (ws_id, 'submission', subj_id, clip_id, 'approved');
+  reset role;
+
+  perform set_config('request.jwt.claims', '', true);
+  ok := public.has_required_approvals(ws_id, 'submission', subj_id, 5000);
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', '2 of 2 approvals clears the gate',
+          case when ok then 'PASS' else 'FAIL gate stayed shut' end);
+
+  -- Under the threshold, one signature is enough — checked on a FRESH subject
+  -- so it cannot pass on the strength of the two approvals above.
+  perform set_config('request.jwt.claims', '', true);
+  subj_id := gen_random_uuid();
+  update public.approval_policies set approval_threshold_amount = 10000
+   where workspace_id = ws_id;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  insert into public.approvals (workspace_id, subject_type, subject_id, approver_id, decision)
+  values (ws_id, 'submission', subj_id, brand_id, 'approved');
+  reset role;
+
+  perform set_config('request.jwt.claims', '', true);
+  ok := public.has_required_approvals(ws_id, 'submission', subj_id, 500);
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'a small payout needs only one approval',
+          case when ok then 'PASS' else 'FAIL small payout still gated' end);
+
+  ok := public.has_required_approvals(ws_id, 'submission', subj_id, 50000);
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'a large payout still needs two',
+          case when ok is not true then 'PASS' else 'FAIL large payout ungated' end);
+
+  -- A stranger to the workspace must see none of it. The clipper is a member
+  -- for this suite, so drop them back out first.
+  delete from public.workspace_members where workspace_id = ws_id and user_id = clip_id;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.approvals where workspace_id = ws_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'a non-member CANNOT read the workspace''s approvals',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  -- The policy itself leaks how the workspace governs its money.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.approval_policies where workspace_id = ws_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'a non-member CANNOT read the approval policy',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  -- A member cannot rewrite the bar they are being held to.
+  perform set_config('request.jwt.claims', '', true);
+  insert into public.workspace_members (workspace_id, user_id, role, accepted_at)
+  values (ws_id, clip_id, 'member', now())
+  on conflict (workspace_id, user_id) do update set role = 'member', accepted_at = now();
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  update public.approval_policies set submission_approvals_required = 1
+   where workspace_id = ws_id;
+  get diagnostics n = row_count;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'a plain member CANNOT lower the approval bar',
+          case when n = 0 then 'PASS' else 'FAIL updated '||n end);
+
+  perform set_config('request.jwt.claims', '', true);
+  insert into rls_results(area, check_name, outcome)
+  values ('approvals', 'policy fixture note',
+          case when had_policy then 'NOTE workspace already had a policy - restored by rollback'
+               else 'NOTE policy created by the suite - removed by rollback' end);
 
 end $$;
 

@@ -3,7 +3,9 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { isSuperAdmin } from "@/lib/admin";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveWorkspace, getUserWorkspaces } from "@/lib/workspaces";
 
 export default async function ProtectedLayout({ children }) {
   const supabase = await createClient();
@@ -14,6 +16,12 @@ export default async function ProtectedLayout({ children }) {
   if (!user) {
     redirect("/login");
   }
+
+  const cookieStore = await cookies();
+  const [workspaces, activeWorkspace] = await Promise.all([
+    getUserWorkspaces(supabase, user),
+    getActiveWorkspace(supabase, user, cookieStore),
+  ]);
 
   const [{ data: profile }, { data: notifications }, { count: unreadCount }] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url, role").eq("id", user.id).single(),
@@ -39,7 +47,13 @@ export default async function ProtectedLayout({ children }) {
         "--header-height": "calc(var(--spacing) * 12)",
       }}
     >
-      <AppSidebar user={user} profile={profile} isAdmin={isSuperAdmin(user)} />
+      <AppSidebar
+        user={user}
+        profile={profile}
+        isAdmin={isSuperAdmin(user)}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspace?.id}
+      />
       <SidebarInset>
         <SiteHeader
           notifications={notifications ?? []}

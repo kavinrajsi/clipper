@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/format";
 import { extractYoutubeVideoId } from "@/lib/youtube";
 import { getWorkspaceRole } from "@/lib/workspaces";
+import { SubmissionApprovals } from "@/components/submission-approvals";
 import { SubmissionReview } from "@/components/submission-review";
 import { RevisionRequestForm } from "@/components/revision-request-form";
 import { Badge } from "@/components/ui/badge";
@@ -40,17 +41,6 @@ export default async function SubmissionReviewPage({ params }) {
     .order("start_seconds", { ascending: true });
 
   const annotations = annotationRows ?? [];
-  const authorIds = [...new Set(annotations.map((a) => a.author_id))];
-
-  let profiles = [];
-  if (authorIds.length > 0) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, avatar_url")
-      .in("id", authorIds);
-    profiles = data ?? [];
-  }
-  const people = Object.fromEntries(profiles.map((p) => [p.id, p]));
   const campaign = submission.application?.campaign;
 
   // Only the workspace can ask for changes; the creator answers with a new
@@ -59,18 +49,51 @@ export default async function SubmissionReviewPage({ params }) {
     ? await getWorkspaceRole(supabase, user, campaign.workspace_id)
     : null;
 
-  const [{ data: revisionRows }, { data: versionRows }] = await Promise.all([
-    supabase
-      .from("revision_requests")
-      .select("*")
-      .eq("submission_id", id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("campaign_submissions")
-      .select("id, revision_number, delivery_state, created_at")
-      .eq("application_id", submission.application_id)
-      .order("revision_number", { ascending: true }),
-  ]);
+  const [{ data: revisionRows }, { data: versionRows }, { data: policy }, { data: approvalRows }] =
+    await Promise.all([
+      supabase
+        .from("revision_requests")
+        .select("*")
+        .eq("submission_id", id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("campaign_submissions")
+        .select("id, revision_number, delivery_state, created_at")
+        .eq("application_id", submission.application_id)
+        .order("revision_number", { ascending: true }),
+      // Both are workspace-member-only under RLS, so a clipper viewing their
+      // own submission simply gets nothing back and the panel stays hidden.
+      campaign
+        ? supabase
+            .from("approval_policies")
+            .select("submission_approvals_required, approval_threshold_amount")
+            .eq("workspace_id", campaign.workspace_id)
+            .maybeSingle()
+        : { data: null },
+      supabase
+        .from("approvals")
+        .select("*")
+        .eq("subject_type", "submission")
+        .eq("subject_id", id),
+    ]);
+
+  const approvals = approvalRows ?? [];
+
+  // One lookup for every name shown on the page — annotation authors and
+  // approvers both.
+  const personIds = [
+    ...new Set([...annotations.map((a) => a.author_id), ...approvals.map((a) => a.approver_id)]),
+  ];
+
+  let profiles = [];
+  if (personIds.length > 0) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", personIds);
+    profiles = data ?? [];
+  }
+  const people = Object.fromEntries(profiles.map((p) => [p.id, p]));
 
   const unresolvedCount = annotations.filter((a) => !a.parent_id && !a.resolved_at).length;
 
@@ -100,6 +123,20 @@ export default async function SubmissionReviewPage({ params }) {
           </Badge>
         </div>
       </div>
+
+      {workspaceRole && campaign && (
+        <div className="mx-auto w-full max-w-5xl">
+          <SubmissionApprovals
+            workspaceId={campaign.workspace_id}
+            submissionId={submission.id}
+            approvals={approvals}
+            required={policy?.submission_approvals_required ?? 1}
+            thresholdAmount={policy?.approval_threshold_amount ?? null}
+            viewerId={user.id}
+            people={people}
+          />
+        </div>
+      )}
 
       <div className="mx-auto w-full max-w-5xl">
         <RevisionRequestForm

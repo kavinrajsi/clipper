@@ -23,7 +23,7 @@ Standing up a local Supabase stack.
 >
 > **A local stack needs the migrations applied too.** `supabase/migrations/` is committed, so `supabase db reset` (or `supabase start` on a fresh volume) replays them. Schema changes pushed straight to the live project via the dashboard or MCP will not be in local until you also add the migration file — which is why every schema change should land as a file in `supabase/migrations/`.
 
-> **Updated 2026-07-26:** `supabase/` now exists and is committed — `supabase/config.toml` plus two migrations in `supabase/migrations/`. The live project (ref `nfeuykwnqqtdecwucujo`, name "Clipping") is no longer the only source of truth for the schema. The `supabase init` / `db pull` steps below are therefore first-time-setup history; if you're cloning fresh, you only need `supabase link` and `supabase start`.
+> **Updated 2026-08-01:** `supabase/` is committed — `config.toml`, **21 migrations**, `seed.sql`, and `tests/rls.sql`. The live project (ref `nfeuykwnqqtdecwucujo`, name "Clipping") is no longer the only source of truth for the schema. The `supabase init` / `db pull` steps below are therefore first-time-setup history; if you're cloning fresh, you only need `supabase link`, `supabase start`, and `supabase db reset` (which replays the migrations and then runs `seed.sql`, without which the RLS suite has no fixture and asserts nothing).
 
 ## Prerequisites
 

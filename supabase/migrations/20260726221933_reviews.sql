@@ -59,7 +59,7 @@ create index if not exists reviews_author_idx  on public.reviews (author_id);
 --
 -- SECURITY DEFINER so the insert policy never reads campaign_applications or
 -- campaigns through their own policies -- the cycle that produced 42P17 once
--- already (see 20260727091000_fix_campaigns_policy_recursion.sql).
+-- already (see 20260726185742_fix_campaigns_policy_recursion.sql).
 -- ---------------------------------------------------------------------------
 
 create or replace function public.can_review(

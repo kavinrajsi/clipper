@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "verify": "npm run lint && npm run build && npm run test:rls",
+    "dev:session": "node scripts/dev-session.mjs",
     "razorpay:probe": "bash scripts/razorpay-probe.sh",
     "test:rls": "bash scripts/rls-test.sh"
   },

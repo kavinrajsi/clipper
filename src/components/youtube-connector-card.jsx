@@ -178,7 +178,7 @@ export function YoutubeConnectorCard({ connection }) {
             <div className="rounded-lg border p-3">
               <p className="text-sm font-medium">Add a code to your bio</p>
               <p className="text-sm text-muted-foreground">
-                Paste a code in your bio to verify ownership. Earn 75% of the campaign's
+                Paste a code in your bio to verify ownership. Earn 75% of the campaign’s
                 payout rate.
               </p>
               <Button
@@ -209,7 +209,7 @@ export function YoutubeConnectorCard({ connection }) {
             {verifyMessage && <p className="text-sm text-muted-foreground">{verifyMessage}</p>}
             <Button size="sm" onClick={handleVerifyBio} disabled={verifying}>
               {verifying && <Spinner />}
-              I've added it — Verify
+              I’ve added it — Verify
             </Button>
           </div>
         )}

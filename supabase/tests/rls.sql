@@ -21,12 +21,16 @@
 --   policy change survives. Safe against production.
 --
 -- READING THE OUTPUT
---   Every row should read PASS. Any FAIL is a real policy defect.
+--   Every row should read PASS, or NOTE where the suite is explaining one of
+--   its own fixtures. Any FAIL is a real policy defect. A SKIP means the
+--   database had no brand/clipper fixture and the suite asserted nothing —
+--   scripts/rls-test.sh treats that as a failure too. Locally, supabase/seed.sql
+--   supplies the fixture.
 --
 -- ADDING CASES
 --   A policy on table A must not read table B if any policy on B reads A.
 --   Route it through a SECURITY DEFINER helper instead — see
---   20260727091000_fix_campaigns_policy_recursion.sql.
+--   20260726185742_fix_campaigns_policy_recursion.sql.
 
 begin;
 
@@ -55,8 +59,17 @@ declare
   procedure_note text;
 begin
   -- Real users of each role. The suite is a no-op if the project has neither.
-  select id into brand_id from public.profiles where role = 'brand'   limit 1;
-  select id into clip_id  from public.profiles where role = 'clipper' limit 1;
+  --
+  -- `order by` is load-bearing, not tidiness. A `limit 1` with no ordering picks
+  -- an arbitrary row, and there is now more than one brand locally: seed.sql
+  -- creates Seed Brand, and scripts/dev-session.mjs creates Dev Tester. Each
+  -- owns a different workspace, and only Seed Brand's has the second member the
+  -- multi-approver UI needs — so an unordered pick silently changes which
+  -- workspace every fixture below is built in, run to run.
+  select id into brand_id from public.profiles
+   where role = 'brand'   order by updated_at, id limit 1;
+  select id into clip_id  from public.profiles
+   where role = 'clipper' order by updated_at, id limit 1;
 
   if brand_id is null or clip_id is null then
     insert into rls_results(area, check_name, outcome)
@@ -149,10 +162,17 @@ begin
   set local role authenticated;
   perform set_config('request.jwt.claims',
     json_build_object('sub', clip_id, 'role','authenticated')::text, true);
-  select count(*) into n from public.campaigns where workspace_id = ws_id;
+  -- Probe the invite-only campaign, not every campaign in the workspace.
+  -- c_public is active, paid and public, so "Clippers can view funded active
+  -- campaigns" shows it to every authenticated user — which the visibility
+  -- section below asserts on purpose. Counting all campaigns here therefore
+  -- always saw at least 1 and could never pass, and it was measuring that
+  -- policy rather than membership. c_invite is the campaign only membership
+  -- could reveal to this user: they are not invited and have not applied.
+  select count(*) into n from public.campaigns where id = c_invite;
   reset role;
   insert into rls_results(area, check_name, outcome)
-  values ('workspaces', 'pending member sees no campaigns',
+  values ('workspaces', 'pending member sees no invite-only campaign',
           case when n = 0 then 'PASS' else 'FAIL saw '||n end);
 
   -- The last owner must survive both demotion and removal.

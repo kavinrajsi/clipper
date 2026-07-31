@@ -53,7 +53,7 @@ create policy "Applicants attach their own items"
 -- Routed through has_applied_to_campaign()/campaign ownership carefully:
 -- campaign_applications policies read campaigns, and campaigns policies read
 -- campaign_applications, so anything here that joins both risks reintroducing
--- the 42P17 cycle fixed in 20260727091000. This policy touches
+-- the 42P17 cycle fixed in 20260726185742. This policy touches
 -- campaign_applications and campaigns in a single EXISTS, which is evaluated
 -- from proposal_attachments and therefore does not close a loop back onto
 -- itself.

@@ -22,7 +22,7 @@ export default function ClipperTermsPage() {
 
       <p className="mt-6 text-sm text-muted-foreground">
         These terms apply specifically to clippers using the platform to connect a channel,
-        build a clipper profile, and apply to brand campaigns. They supplement, and don't
+        build a clipper profile, and apply to brand campaigns. They supplement, and don’t
         replace, the general Terms of Service.
       </p>
 
@@ -73,7 +73,7 @@ export default function ClipperTermsPage() {
       <h2 className="mt-8 text-lg font-semibold">5. Prohibited Content</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         You may not submit or represent content that infringes third-party rights, violates
-        YouTube's own policies, contains fraudulent engagement, or otherwise violates
+        YouTube’s own policies, contains fraudulent engagement, or otherwise violates
         applicable law.
       </p>
 

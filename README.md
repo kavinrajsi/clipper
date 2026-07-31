@@ -47,20 +47,33 @@ SUPER_ADMIN_EMAIL=
 
 ### Database
 
-**There is no local migration history yet** — `supabase/` doesn't exist in this repo (see `AGENTS.md`). The schema lives only in the live Supabase project (ref `nfeuykwnqqtdecwucujo`). Until `supabase/` is set up, make schema changes by running SQL directly against that project (SQL Editor, or Supabase MCP tools if connected).
-
-To set up local dev / reconstruct migration history:
+`supabase/` is committed — `config.toml`, 21 migrations, `seed.sql`, and the RLS suite in `tests/`. Develop against the local stack, not the live project (ref `nfeuykwnqqtdecwucujo`).
 
 ```bash
 brew install --cask orbstack   # or Docker Desktop — local stack needs a container runtime
 supabase login
-supabase init
 supabase link --project-ref nfeuykwnqqtdecwucujo
-supabase db pull                # pulls remote schema down as migrations/
-supabase start                  # local Postgres/Auth/Storage/Studio
+supabase start                 # local Postgres/Auth/Storage/Studio
+supabase db reset              # replays every migration, then runs seed.sql
 ```
 
-`supabase start` prints a local API URL + anon/service_role keys — use those in a separate env file for local dev instead of the prod values in `.env.local`. `supabase/migrations/` and `supabase/config.toml` should be committed once created; `.gitignore` already excludes the CLI's local-only state (`.branches`, `.temp`, `.env`).
+`.env.development.local` already points the app at the local stack and Next.js gives it precedence over `.env.local` in dev — so **`npm run dev` needs OrbStack running**, or every page renders empty with no error to explain why.
+
+New schema changes go through `supabase migration new <name>`, tested locally with `supabase db reset` and `npm run verify`, then `supabase db push`. Migration filenames must match the version the database records — see `supabase/migrations/README.md`.
+
+### Verification
+
+`.env*` is gitignored, so a fresh clone has no `DATABASE_URL` and `test:rls` will exit 2 with instructions. Add it once:
+
+```bash
+echo 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres' >> .env.development.local
+```
+
+```bash
+npm run verify     # lint -> build -> test:rls
+```
+
+`npm run test:rls` runs the RLS suite against `DATABASE_URL` inside a transaction that rolls back. FAIL and SKIP both fail the run; a SKIP means the fixture was missing and nothing was asserted.
 
 ## Route map
 

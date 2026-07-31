@@ -13,7 +13,7 @@ Found while reading the code. Independent of any feature, and all cheap.
 | **Missing `!user` guard** — the only protected page without one | `src/app/(protected)/dashboard/page.jsx:8` | Add the standard `if (!user) redirect(...)`. Currently masked by the layout, but the page isn't independently defensive |
 | ~~Stale legal copy~~ — **not stale after all** | `src/app/(legal)/clipper-terms/page.js:67` | "No real payouts are processed today" is **accurate**: Route isn't enabled, so payouts genuinely cannot run. Only "once a payment processor is integrated" is imprecise — the code exists, the product isn't provisioned. Revisit when Route is enabled |
 | **Plaintext PII** — PAN, bank account, IFSC, and OAuth tokens in plain `text` columns despite `pgcrypto` being installed | `clipper_payout_accounts`, `youtube_connections` | Supabase Vault or column encryption. Gets worse with every platform added in Phase 4 |
-| **Stale docs** — `docs/supabase.md` and `AGENTS.md` both claim `supabase/` doesn't exist; it does, with two committed migrations | `docs/supabase.md:3`, `AGENTS.md` | Update both |
+| ~~**Stale docs**~~ — fixed 2026-08-01. `AGENTS.md`, `README.md`, `docs/supabase.md` and `docs/product/sql/README.md` all claimed `supabase/` didn't exist or held two migrations; it holds 21, plus `seed.sql` and the RLS suite | — | Done |
 
 ---
 

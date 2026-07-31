@@ -27,7 +27,7 @@ export default function SupportPage() {
             <a href="mailto:[CONTACT EMAIL]" className="underline underline-offset-4">
               [CONTACT EMAIL]
             </a>{" "}
-            and we'll get back to you.
+            and we’ll get back to you.
           </p>
         </CardContent>
       </Card>
@@ -39,7 +39,7 @@ export default function SupportPage() {
           <Link href="/connectors" className="underline underline-offset-4">
             Connectors
           </Link>{" "}
-          and hit "Sync now." If that doesn't help, try disconnecting and reconnecting.
+          and hit “Sync now.” If that doesn’t help, try disconnecting and reconnecting.
         </li>
         <li>
           <strong>Signed up with the wrong role</strong> — switch between Clipper and Brand

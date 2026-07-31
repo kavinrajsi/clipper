@@ -1,34 +1,41 @@
-# Phase 1 migrations — staged, not applied
+# Phase 1 migrations — three applied, one still staged
 
-These files are **not** in `supabase/migrations/`. Dropping them there means the next `supabase db push` executes them, which is a decision for you to make deliberately rather than a side effect of reading a spec.
+> **⚠ Do not bulk-copy this directory into `supabase/migrations/`.** Three of the four files have already shipped, under different names and split differently. Re-applying them is not idempotent.
 
-## To apply
+| File | Status | Where it landed |
+|---|---|---|
+| `01-marketplace.sql` | **applied**, split across three | `20260726173551_public_creator_profiles.sql`, `20260726180547_saved_items.sql`, `20260726221933_reviews.sql` |
+| `02-hiring.sql` | **applied** | `20260726185312_campaign_visibility_and_invites.sql`, `20260726185742_fix_campaigns_policy_recursion.sql`, `20260726201056_proposals.sql` |
+| `03-collaboration.sql` | **applied** | `20260726203028_notifications.sql` |
+| `04-monetisation.sql` | **not applied, and blocked** | only `campaign_payouts.platform_fee_amount` shipped, in `20260726222930_platform_commission.sql` |
 
-Review, then move each file in order into `supabase/migrations/` with a real timestamp prefix:
+01–03 are kept here as the specs they were written as. Read them for intent; do not run them.
+
+One divergence worth knowing: these files create `creator_stats` as a **materialized view** with a `refresh_creator_stats()` function. What actually shipped is a **plain view**. `../07-analytics.md` assumes the materialized version and builds `creator_leaderboard` on top of it — resolve that before building the leaderboard.
+
+## `04-monetisation.sql` — the one that is still live work
+
+It is blocked, not forgotten: the wallet model depends on Razorpay **Direct Transfers**, which is not enabled on this account (neither is Route — see `npm run razorpay:probe` and the warning in `../../../AGENTS.md`). Its `brand_wallets.owner_id` also predates the shipped workspaces migration and should become `workspace_id` before it is applied.
+
+To apply it once unblocked, generate the migration properly rather than copying the file:
 
 ```bash
-# from the repo root
-for f in 01-marketplace 02-hiring 03-collaboration 04-monetisation; do
-  cp "docs/product/sql/${f}.sql" \
-     "supabase/migrations/$(date -u +%Y%m%d%H%M%S)_${f#*-}.sql"
-  sleep 1   # distinct timestamps
-done
-
+supabase migration new monetisation   # then paste the reviewed contents in
+supabase db reset                     # test locally first — replays everything + seed.sql
+npm run verify
 supabase db push
 ```
 
-Or generate them one at a time with `supabase migration new <name>` and paste the contents in — which is the workflow the project should converge on.
+**Test against the local stack first** (`supabase start`), never the live project.
 
-**Test against a local stack first** (`supabase start`), not the live project. See [`../../supabase.md`](../../supabase.md) for local setup — note that doc's claim that `supabase/` doesn't exist is stale; it does, with two committed migrations.
+## What each file contains
 
-## Order matters
-
-| File | Contents | Depends on |
+| File | Contents | Depended on |
 |---|---|---|
-| `01-marketplace.sql` | Public profiles, portfolio, reviews, saves, follows, creator stats | — |
-| `02-hiring.sql` | Campaign visibility, invites, proposals. **Fixes the broken `campaigns` RLS policy.** | `01` (portfolio for attachments) |
+| `01-marketplace.sql` | Public profiles, portfolio, reviews, saves, follows, creator stats | `02` (portfolio for attachments) |
+| `02-hiring.sql` | Campaign visibility, invites, proposals. **Fixed the broken `campaigns` RLS policy.** | — |
 | `03-collaboration.sql` | Notifications, preferences, activity events | — |
-| `04-monetisation.sql` | Commission columns | — |
+| `04-monetisation.sql` | `platform_settings`, `brand_wallets`, `wallet_transactions`, `wallet_reservations`, `invoices` — the wallet model. Only the commission column shipped from this one. | — |
 
 ## Conventions followed
 

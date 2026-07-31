@@ -44,9 +44,9 @@ Every table has RLS enabled. Three patterns recur — match one of them for new 
 
 **A policy on table A must not read table B if any policy on B reads A.** Postgres raises `42P17 infinite recursion` at *query* time, not at policy-creation time, so the policy is created happily and every affected query then fails. This shipped once: `campaigns`' "applied to" policy reads `campaign_applications`, whose brand policy reads `campaigns` — clippers could not list campaigns at all.
 
-Route the inner lookup through a `SECURITY DEFINER` helper instead (`has_applied_to_campaign`, `is_invited_to_campaign` in `20260727091000_fix_campaigns_policy_recursion.sql`). Those bypass RLS on the inner table — safe here because the tables are `postgres`-owned and do not `FORCE` row security — and each answers only a yes/no about the caller.
+Route the inner lookup through a `SECURITY DEFINER` helper instead (`has_applied_to_campaign`, `is_invited_to_campaign` in `20260726185742_fix_campaigns_policy_recursion.sql`). Those bypass RLS on the inner table — safe here because the tables are `postgres`-owned and do not `FORCE` row security — and each answers only a yes/no about the caller.
 
-**Checking `pg_policies` does not catch this.** Run `npm run test:rls` (`supabase/tests/rls.sql`), which impersonates real brand/clipper users and runs the queries the app runs, inside a transaction that rolls back. Every row should read PASS.
+**Checking `pg_policies` does not catch this.** Run `npm run test:rls` (`supabase/tests/rls.sql`), which impersonates real brand/clipper users and runs the queries the app runs, inside a transaction that rolls back. See "Verification" below for how to read the result — a green run is not the same as an all-PASS run.
 
 Related: `eslint.config.mjs` enables `no-undef` because `next build` does not render dynamic Server Components and so will not catch a `ReferenceError` in one — that shipped once too.
 
@@ -100,21 +100,49 @@ If only the first pair flips, that is a **second support request, not a bug** �
 - Per-view payouts depend on the clipper having synced the submitted video via Connectors — if it's not in `youtube_videos`, the payout falls back to a submission-time snapshot (`view_count_at_submission`), which may be `null` if that wasn't captured either.
 - Brand-only pages aren't route-gated by role (see "Auth and roles" above).
 
-## No local migration history (yet)
+## Local stack and migration history
 
-**`supabase/` does not exist in this repo as of this writing** — every migration built for this project was created and later removed from disk outside of git's tracking (not gitignored, never committed). The live Supabase project (ref `nfeuykwnqqtdecwucujo`, from `NEXT_PUBLIC_SUPABASE_URL`) is the **only** source of truth for the schema until someone runs the local setup below. Don't assume migration files exist, don't try to diff against them, and check the live project directly (Supabase MCP tools — `list_tables`, `execute_sql` — or the dashboard) before making schema changes, unless you've just confirmed `supabase/migrations/` exists on disk.
+**`supabase/` exists and is committed** — `config.toml`, 21 migrations, `seed.sql`, and `tests/rls.sql`. An earlier version of this file said it did not; that was true once and is not now. The live project (ref `nfeuykwnqqtdecwucujo`) is no longer the only source of truth, though it is still ahead of nothing and behind nothing — the two match as of the last `db pull`.
 
-To set up local dev and reconstruct migration history (needs a container runtime — OrbStack or Docker Desktop):
+Fresh clone, given a container runtime (OrbStack or Docker Desktop):
 
 ```bash
-brew install --cask orbstack
 supabase login
-supabase init
 supabase link --project-ref nfeuykwnqqtdecwucujo
-supabase db pull      # writes supabase/migrations/ from the live schema
 supabase start        # local Postgres/Auth/Storage/Studio, separate from prod data
+supabase db reset     # replays every migration, then runs seed.sql
 ```
 
-Once `supabase/` exists: **commit** `supabase/migrations/` and `supabase/config.toml`; `.gitignore` already excludes the CLI's local-only state (`supabase/.branches`, `supabase/.temp`, `supabase/.env`). New schema changes should then go through `supabase migration new <name>` + `supabase db push`/`db pull` rather than only against the live project directly — update this section once that's actually the workflow in use, since right now it isn't.
+`.env.development.local` already points the app at the local stack (`http://127.0.0.1:54321`) and Next.js gives it precedence in dev. **If OrbStack isn't running, `npm run dev` has no database at all** — pages render empty with no error, which looks like a UI bug and isn't.
+
+**Migration filenames must match the version the database recorded.** Most existing migrations were applied through the Supabase MCP `apply_migration` tool, which generates its own timestamp; hand-named files drifted from `supabase_migrations.schema_migrations`, which made every migration look unapplied to the CLI and would have made `db push` re-run non-idempotent files. They were renamed to the recorded versions in `10f9b32`. See `supabase/migrations/README.md` before adding one — including the three recorded versions that deliberately have no file.
+
+## Verification
+
+`npm run verify` = `lint` → `build` → `test:rls`, one exit code. Run it before every commit.
+
+- **`npm run test:rls`** runs `supabase/tests/rls.sql` against `DATABASE_URL` inside a transaction that rolls back. It impersonates real brand/clipper users and runs the queries the app runs. `DATABASE_URL` is not in git (`.gitignore` excludes `.env*`), so on a fresh clone add it yourself — the script exits 2 with instructions until you do:
+
+  ```
+  # .env.development.local
+  DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  ```
+- The suite reports by SELECTing rows, so **psql exits 0 even on a wall of FAIL rows** — `scripts/rls-test.sh` reads the verdict out of the output instead. FAIL and SKIP both fail the run; NOTE is allowed. A SKIP means the fixture was missing and nothing was asserted.
+- **`supabase/seed.sql`** supplies that fixture (a brand with a workspace, a clipper, a second workspace member). Without it the whole suite returned one SKIP row and looked green.
+- New table? Add cases to `rls.sql`, and **prove they can fail** — break the policy, confirm the row turns red, restore. An all-PASS run is evidence of nothing otherwise.
+
+### Rendering a protected page
+
+`next build` does not render dynamic Server Components, which is most of this app, so a protected page can ship having never been rendered once. That has already happened — `/workspace/settings` went out in `0aab9ac` with build, lint and RLS coverage only.
+
+Sign-in is Google-only, so there is no scriptable login. `scripts/dev-session.mjs` works around it against the local stack: it signs in (creating `dev@local.test` as a brand with a workspace on first run, through the real `handle_new_user` path) and prints the session as a Cookie header.
+
+```bash
+curl -s -H "Cookie: $(npm run -s dev:session -- --header)" http://localhost:3000/workspace/settings
+```
+
+It refuses to run unless `NEXT_PUBLIC_SUPABASE_URL` is localhost — against the hosted project it would create a real password account on a Google-only product.
+
+**This covers server rendering, not interaction.** Client components, form submits and realtime still need a human, or a Chrome MCP session driven through a real Google login. Injecting the cookie into Chrome directly does not work: the permission classifier blocks setting an auth cookie via `document.cookie`.
 
 Local Supabase also needs its own Google OAuth redirect URI (`http://127.0.0.1:54321/auth/v1/callback`) registered in the Google Cloud console alongside the prod one — the YouTube connector's OAuth client is separate from Supabase's, see "Auth and roles" above.

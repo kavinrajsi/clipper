@@ -121,7 +121,12 @@ supabase db reset     # replays every migration, then runs seed.sql
 
 `npm run verify` = `lint` → `build` → `test:rls`, one exit code. Run it before every commit.
 
-- **`npm run test:rls`** runs `supabase/tests/rls.sql` against `DATABASE_URL` (set in `.env.development.local` for the local stack) inside a transaction that rolls back. It impersonates real brand/clipper users and runs the queries the app runs.
+- **`npm run test:rls`** runs `supabase/tests/rls.sql` against `DATABASE_URL` inside a transaction that rolls back. It impersonates real brand/clipper users and runs the queries the app runs. `DATABASE_URL` is not in git (`.gitignore` excludes `.env*`), so on a fresh clone add it yourself — the script exits 2 with instructions until you do:
+
+  ```
+  # .env.development.local
+  DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  ```
 - The suite reports by SELECTing rows, so **psql exits 0 even on a wall of FAIL rows** — `scripts/rls-test.sh` reads the verdict out of the output instead. FAIL and SKIP both fail the run; NOTE is allowed. A SKIP means the fixture was missing and nothing was asserted.
 - **`supabase/seed.sql`** supplies that fixture (a brand with a workspace, a clipper, a second workspace member). Without it the whole suite returned one SKIP row and looked green.
 - New table? Add cases to `rls.sql`, and **prove they can fail** — break the policy, confirm the row turns red, restore. An all-PASS run is evidence of nothing otherwise.

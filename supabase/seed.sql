@@ -19,24 +19,38 @@
 --           trigger on profiles, so it is not inserted here)
 --   ...0002 clipper, unrelated to that workspace — the outsider every deny-case
 --           in the suite impersonates
---   ...0003 a second accepted member of the brand's workspace, so an approval
---           policy of min_approvals = 2 is satisfiable. Without a second body
---           the approvals section can only ever test the unsatisfiable path.
-insert into auth.users (id, email, aud, role, created_at, updated_at)
+--   ...0003 a second accepted member of the brand's workspace. NOT required by
+--           the RLS suite — checked by removing it, and all ten approvals cases
+--           still pass, because the suite mints its own second approver. It is
+--           here for manual UI testing: the approvals panel only renders when
+--           the policy asks for more than one signature, and a policy needing
+--           more approvals than the workspace has members is refused at save.
+-- The role and name go in raw_user_meta_data rather than into a separate
+-- profiles insert, because that is the real signup path: the
+-- on_auth_user_created trigger calls handle_new_user(), which reads exactly
+-- these two keys and defaults role to 'clipper'. Seeding this way means the
+-- fixture also proves that chain works — and a plain profiles insert with
+-- `on conflict do nothing` would have silently lost the brand role to the
+-- trigger's default, leaving no workspace and skipping the whole suite.
+insert into auth.users (id, email, aud, role, raw_user_meta_data, created_at, updated_at)
 values
-  ('00000000-0000-4000-8000-000000000001', 'brand@seed.local',    'authenticated', 'authenticated', now(), now()),
-  ('00000000-0000-4000-8000-000000000002', 'clipper@seed.local',  'authenticated', 'authenticated', now(), now()),
-  ('00000000-0000-4000-8000-000000000003', 'teammate@seed.local', 'authenticated', 'authenticated', now(), now())
+  ('00000000-0000-4000-8000-000000000001', 'brand@seed.local',    'authenticated', 'authenticated',
+   '{"full_name":"Seed Brand","role":"brand"}'::jsonb,      now(), now()),
+  ('00000000-0000-4000-8000-000000000002', 'clipper@seed.local',  'authenticated', 'authenticated',
+   '{"full_name":"Seed Clipper","role":"clipper"}'::jsonb,  now(), now()),
+  ('00000000-0000-4000-8000-000000000003', 'teammate@seed.local', 'authenticated', 'authenticated',
+   '{"full_name":"Seed Teammate","role":"clipper"}'::jsonb, now(), now())
 on conflict (id) do nothing;
 
--- Order matters: the brand profile fires ensure_workspace_for_brand, which
--- creates the workspace and the owner's workspace_members row.
+-- Belt and braces: if the trigger is ever missing, this still produces the
+-- fixture, and the update path fires ensure_workspace_for_brand just as the
+-- insert path does (the trigger is AFTER INSERT OR UPDATE OF role).
 insert into public.profiles (id, full_name, role)
 values
   ('00000000-0000-4000-8000-000000000001', 'Seed Brand',    'brand'),
   ('00000000-0000-4000-8000-000000000002', 'Seed Clipper',  'clipper'),
   ('00000000-0000-4000-8000-000000000003', 'Seed Teammate', 'clipper')
-on conflict (id) do nothing;
+on conflict (id) do update set role = excluded.role, full_name = excluded.full_name;
 
 -- The teammate is a brand-side collaborator, not a creator, despite the
 -- 'clipper' profile role — role and workspace membership are separate axes.

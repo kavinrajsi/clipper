@@ -63,6 +63,12 @@ New schema changes go through `supabase migration new <name>`, tested locally wi
 
 ### Verification
 
+`.env*` is gitignored, so a fresh clone has no `DATABASE_URL` and `test:rls` will exit 2 with instructions. Add it once:
+
+```bash
+echo 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres' >> .env.development.local
+```
+
 ```bash
 npm run verify     # lint -> build -> test:rls
 ```

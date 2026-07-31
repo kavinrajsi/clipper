@@ -1,0 +1,15 @@
+-- Intentionally empty.
+--
+-- This version is recorded in the production ledger
+-- (supabase_migrations.schema_migrations), but its SQL lives in
+-- 20260726185312_campaign_visibility_and_invites.sql — it was a follow-up fix applied minutes
+-- after the migration it corrected, and was folded into that file rather than
+-- left as a near-empty migration of its own.
+--
+-- The file exists only so `supabase db push` can run. Without it the CLI sees a
+-- remote version with no local file, refuses to push anything, and suggests
+-- `migration repair --status reverted` — which would delete the ledger row and
+-- with it the real record of what ran against production. See README.md.
+--
+-- A fresh `db reset` applies this no-op at this point in the sequence; the
+-- schema comes out identical either way.

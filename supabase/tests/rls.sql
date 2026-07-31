@@ -59,8 +59,17 @@ declare
   procedure_note text;
 begin
   -- Real users of each role. The suite is a no-op if the project has neither.
-  select id into brand_id from public.profiles where role = 'brand'   limit 1;
-  select id into clip_id  from public.profiles where role = 'clipper' limit 1;
+  --
+  -- `order by` is load-bearing, not tidiness. A `limit 1` with no ordering picks
+  -- an arbitrary row, and there is now more than one brand locally: seed.sql
+  -- creates Seed Brand, and scripts/dev-session.mjs creates Dev Tester. Each
+  -- owns a different workspace, and only Seed Brand's has the second member the
+  -- multi-approver UI needs — so an unordered pick silently changes which
+  -- workspace every fixture below is built in, run to run.
+  select id into brand_id from public.profiles
+   where role = 'brand'   order by updated_at, id limit 1;
+  select id into clip_id  from public.profiles
+   where role = 'clipper' order by updated_at, id limit 1;
 
   if brand_id is null or clip_id is null then
     insert into rls_results(area, check_name, outcome)

@@ -22,6 +22,14 @@ the version the tool records. If you use `supabase migration new`, the CLI picks
 the version and applying it via the CLI keeps both sides in step. Mixing the two
 without matching versions is what caused this.
 
+## One file here has no entry in the database (yet)
+
+`20260731191104_local_parity_avatars_and_signup_trigger.sql` is **local-only** until someone runs `supabase db push`. `supabase migration list` shows it as a local-only row; that is expected, and the opposite direction from the three below.
+
+It exists because `supabase db diff --linked` found three things the live project had that no migration created — they were made through the dashboard: the `avatars` bucket, its three `storage.objects` policies, and the `on_auth_user_created` trigger. So a fresh `db reset` produced a database that did not match production, and every RLS assertion run against it was testing the wrong schema.
+
+Schema-wise the two sides already agree; the file only adds what production already has. It is written to be a no-op there, **verified** by running it three times against local — reruns exit 0 and leave the same three policies, one bucket and one trigger. Push it whenever the next migration goes up.
+
 ## Three entries exist in the database with no file here
 
 | Recorded version | Name | Where its SQL lives now |

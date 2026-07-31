@@ -138,7 +138,7 @@ supabase db reset     # replays every migration, then runs seed.sql
 Sign-in is Google-only, so there is no scriptable login. `scripts/dev-session.mjs` works around it against the local stack: it signs in (creating `dev@local.test` as a brand with a workspace on first run, through the real `handle_new_user` path) and prints the session as a Cookie header.
 
 ```bash
-curl -s -H "Cookie: $(node scripts/dev-session.mjs --header)" http://localhost:3000/workspace/settings
+curl -s -H "Cookie: $(npm run -s dev:session -- --header)" http://localhost:3000/workspace/settings
 ```
 
 It refuses to run unless `NEXT_PUBLIC_SUPABASE_URL` is localhost — against the hosted project it would create a real password account on a Google-only product.

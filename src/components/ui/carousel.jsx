@@ -31,14 +31,31 @@ function Carousel({
     ...opts,
     axis: orientation === "horizontal" ? "x" : "y",
   }, plugins)
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false)
-  const [canScrollNext, setCanScrollNext] = React.useState(false)
+  // Embla is an external store, so read it with useSyncExternalStore instead of
+  // mirroring it into state. The mirrored version had to seed itself by calling
+  // onSelect(api) inside an effect, which is a synchronous setState in an effect
+  // (react-hooks/set-state-in-effect) and left the arrows briefly wrong on the
+  // first paint. Subscribing here keeps the reads always current.
+  const subscribe = React.useCallback((onStoreChange) => {
+    if (!api) return () => {}
+    api.on("select", onStoreChange)
+    api.on("reInit", onStoreChange)
+    return () => {
+      api.off("select", onStoreChange)
+      api.off("reInit", onStoreChange)
+    }
+  }, [api])
 
-  const onSelect = React.useCallback((api) => {
-    if (!api) return
-    setCanScrollPrev(api.canScrollPrev())
-    setCanScrollNext(api.canScrollNext())
-  }, [])
+  const canScrollPrev = React.useSyncExternalStore(
+    subscribe,
+    () => (api ? api.canScrollPrev() : false),
+    () => false
+  )
+  const canScrollNext = React.useSyncExternalStore(
+    subscribe,
+    () => (api ? api.canScrollNext() : false),
+    () => false
+  )
 
   const scrollPrev = React.useCallback(() => {
     api?.scrollPrev()
@@ -62,17 +79,6 @@ function Carousel({
     if (!api || !setApi) return
     setApi(api)
   }, [api, setApi])
-
-  React.useEffect(() => {
-    if (!api) return
-    onSelect(api)
-    api.on("reInit", onSelect)
-    api.on("select", onSelect)
-
-    return () => {
-      api?.off("select", onSelect)
-    };
-  }, [api, onSelect])
 
   return (
     <CarouselContext.Provider

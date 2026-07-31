@@ -24,14 +24,14 @@ export default function TermsPage() {
       <h2 className="mt-8 text-lg font-semibold">1. Accounts & Eligibility</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         You must provide accurate information when creating an account and choose whether
-        you're signing up as a Brand or a Clipper. You're responsible for activity under your
+        you’re signing up as a Brand or a Clipper. You’re responsible for activity under your
         account and for keeping your login credentials secure.
       </p>
 
       <h2 className="mt-8 text-lg font-semibold">2. Acceptable Use</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Don't misrepresent your identity or channel ownership, don't submit fraudulent view or
-        engagement data, and don't use the platform for unlawful, infringing, or abusive
+        Don’t misrepresent your identity or channel ownership, don’t submit fraudulent view or
+        engagement data, and don’t use the platform for unlawful, infringing, or abusive
         purposes.
       </p>
 
@@ -40,14 +40,14 @@ export default function TermsPage() {
         Brands may create campaigns describing the content they want, a payout structure, and a
         budget. Clippers may apply to active campaigns; a brand may approve or reject an
         application at its discretion. Approval does not itself guarantee payment — see the
-        Clipper Terms and each campaign's specific requirements.
+        Clipper Terms and each campaign’s specific requirements.
       </p>
 
       <h2 className="mt-8 text-lg font-semibold">4. Payments</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Brands fund a campaign's budget through Razorpay before it goes active. When a brand
-        approves a clipper's submission, the payout amount is transferred to Razorpay on hold;
-        the brand releases the hold to complete payment to the clipper's connected payout
+        Brands fund a campaign’s budget through Razorpay before it goes active. When a brand
+        approves a clipper’s submission, the payout amount is transferred to Razorpay on hold;
+        the brand releases the hold to complete payment to the clipper’s connected payout
         account. Clippers must complete payout account verification before funds can be
         released to them.
       </p>
@@ -70,7 +70,7 @@ export default function TermsPage() {
 
       <h2 className="mt-8 text-lg font-semibold">7. Disclaimers & Limitation of Liability</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        The platform is provided "as is" without warranties of any kind. To the maximum extent
+        The platform is provided “as is” without warranties of any kind. To the maximum extent
         permitted by law, [PLATFORM NAME] is not liable for indirect, incidental, or
         consequential damages arising from your use of the platform.
       </p>

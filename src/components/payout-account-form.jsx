@@ -60,8 +60,23 @@ export function PayoutAccountForm({ user, payoutAccount, className, ...props }) 
   }
 
   useEffect(() => {
-    if (status === "pending" || status === "under_review") {
-      checkStatus()
+    if (status !== "pending" && status !== "under_review") return
+
+    // Deliberately not calling checkStatus() here: its first statement is
+    // setCheckingStatus(true), which is a synchronous setState inside an effect
+    // (react-hooks/set-state-in-effect). The spinner belongs to the "Refresh
+    // status" button anyway — this mount check is meant to be invisible.
+    let cancelled = false
+    fetch("/api/payments/payout-account/check-status", { method: "POST" })
+      .then((response) => response.json().catch(() => null))
+      .then((result) => {
+        if (cancelled || !result?.status) return
+        setStatus(result.status)
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
     }
     // Only check once on mount for the initial status — the "Refresh status"
     // button covers manual re-checks after that.

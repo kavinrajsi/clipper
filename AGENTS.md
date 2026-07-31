@@ -131,4 +131,18 @@ supabase db reset     # replays every migration, then runs seed.sql
 - **`supabase/seed.sql`** supplies that fixture (a brand with a workspace, a clipper, a second workspace member). Without it the whole suite returned one SKIP row and looked green.
 - New table? Add cases to `rls.sql`, and **prove they can fail** — break the policy, confirm the row turns red, restore. An all-PASS run is evidence of nothing otherwise.
 
+### Rendering a protected page
+
+`next build` does not render dynamic Server Components, which is most of this app, so a protected page can ship having never been rendered once. That has already happened — `/workspace/settings` went out in `0aab9ac` with build, lint and RLS coverage only.
+
+Sign-in is Google-only, so there is no scriptable login. `scripts/dev-session.mjs` works around it against the local stack: it signs in (creating `dev@local.test` as a brand with a workspace on first run, through the real `handle_new_user` path) and prints the session as a Cookie header.
+
+```bash
+curl -s -H "Cookie: $(node scripts/dev-session.mjs --header)" http://localhost:3000/workspace/settings
+```
+
+It refuses to run unless `NEXT_PUBLIC_SUPABASE_URL` is localhost — against the hosted project it would create a real password account on a Google-only product.
+
+**This covers server rendering, not interaction.** Client components, form submits and realtime still need a human, or a Chrome MCP session driven through a real Google login. Injecting the cookie into Chrome directly does not work: the permission classifier blocks setting an auth cookie via `document.cookie`.
+
 Local Supabase also needs its own Google OAuth redirect URI (`http://127.0.0.1:54321/auth/v1/callback`) registered in the Google Cloud console alongside the prod one — the YouTube connector's OAuth client is separate from Supabase's, see "Auth and roles" above.

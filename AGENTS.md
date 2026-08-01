@@ -59,6 +59,14 @@ Trigger functions never need EXECUTE (the trigger mechanism does not check it), 
 
 Related: `eslint.config.mjs` enables `no-undef` because `next build` does not render dynamic Server Components and so will not catch a `ReferenceError` in one — that shipped once too.
 
+## Blocked on somebody else's dashboard
+
+`docs/manual-steps.md` lists the things that cannot be fixed with a migration or
+a commit — the Razorpay Route/Direct Transfers ticket, the hosted storage upload
+limit, the local Google OAuth redirect URI, and two security-advisor findings
+that need a decision rather than a reflex. Check it before concluding something
+is broken in code.
+
 ## Payments (Razorpay)
 
 Uses **Razorpay Route** — the marketplace split-payment product (`account`/linked-account + `transfer` with `on_hold`). Note: Razorpay also has a product literally called "Escrow" (RazorpayX Escrow Plus) — that's for lending/co-lending pooled funds, unrelated, don't confuse the two. **Route is not currently enabled on the account — see the warning below before touching payout code.**

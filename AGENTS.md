@@ -46,6 +46,15 @@ Every table has RLS enabled. Three patterns recur — match one of them for new 
 
 Route the inner lookup through a `SECURITY DEFINER` helper instead (`has_applied_to_campaign`, `is_invited_to_campaign` in `20260726185742_fix_campaigns_policy_recursion.sql`). Those bypass RLS on the inner table — safe here because the tables are `postgres`-owned and do not `FORCE` row security — and each answers only a yes/no about the caller.
 
+### Revoking EXECUTE takes all three grantees
+
+A `SECURITY DEFINER` function in `public` is reachable at `/rest/v1/rpc/<name>` unless EXECUTE is revoked from **`public`, `anon` and `authenticated`**. Missing either half achieves nothing, and both halves have already been got wrong here:
+
+- Postgres grants EXECUTE to `PUBLIC` by default and both roles inherit it, so revoking from the two roles alone leaves the function callable.
+- Supabase *also* grants EXECUTE to `anon` and `authenticated` directly, so `revoke ... from public` alone does not undo those — which is why several migrations that look like they handled this did not.
+
+Trigger functions never need EXECUTE (the trigger mechanism does not check it), so revoke freely — `20260801051640_revoke_execute_on_trigger_functions.sql` does this for all of them and asserts the result. **Policy helpers are the opposite**: a definer function called inside an RLS policy *is* permission-checked against the caller, so `is_workspace_member` and friends must stay granted to `authenticated` or every policy using them breaks.
+
 **Checking `pg_policies` does not catch this.** Run `npm run test:rls` (`supabase/tests/rls.sql`), which impersonates real brand/clipper users and runs the queries the app runs, inside a transaction that rolls back. See "Verification" below for how to read the result — a green run is not the same as an all-PASS run.
 
 Related: `eslint.config.mjs` enables `no-undef` because `next build` does not render dynamic Server Components and so will not catch a `ReferenceError` in one — that shipped once too.

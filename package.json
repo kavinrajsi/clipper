@@ -7,11 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify": "npm run lint && npm run build && npm run highlights:check && npm run test:rls",
+    "verify": "npm run lint && npm run build && npm run highlights:check && npm run brief:check && npm run test:rls",
     "dev:session": "node scripts/dev-session.mjs",
     "razorpay:probe": "bash scripts/razorpay-probe.sh",
     "sarvam:probe": "node scripts/sarvam-probe.mjs",
     "highlights:check": "node scripts/highlights-check.mjs",
+    "brief:check": "node scripts/brief-check.mjs",
     "test:rls": "bash scripts/rls-test.sh"
   },
   "dependencies": {

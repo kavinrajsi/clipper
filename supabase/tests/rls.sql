@@ -54,6 +54,9 @@ declare
   app_id    uuid;
   pay_id    uuid;
   subj_id   uuid;
+  job_solo  uuid;
+  job_ws    uuid;
+  job_other uuid;
   had_policy boolean;
 
   procedure_note text;
@@ -714,6 +717,276 @@ begin
   values ('approvals', 'policy fixture note',
           case when had_policy then 'NOTE workspace already had a policy - restored by rollback'
                else 'NOTE policy created by the suite - removed by rollback' end);
+
+  ---------------------------------------------------------------------------
+  -- 9. AI jobs. Two things are being checked, and they fail differently.
+  --
+  --    Reads: a job has two possible owners and only one is guaranteed, so
+  --    there are two OR-ed select policies. The case that matters is the
+  --    workspace-less job — a clipper's quality score — which only the
+  --    user_id policy can reach.
+  --
+  --    Writes: there is no insert/update/delete policy at all, by design.
+  --    Note the asymmetry in how that surfaces: INSERT fails loudly on the
+  --    missing WITH CHECK, while UPDATE silently matches zero rows, because
+  --    USING filters the row out before it is ever considered. A test that
+  --    expected an exception from the UPDATE would report a false failure.
+  ---------------------------------------------------------------------------
+  -- The approvals section above made the clipper an accepted member of ws_id
+  -- to get a second approver, and left them there. Every "non-member" check
+  -- below would otherwise be run as a member and pass for the wrong reason —
+  -- which is exactly what happened first time round: three of them reported
+  -- FAIL and the policies were fine. Undo it here rather than in the approvals
+  -- section, which still needs the membership while it runs.
+  perform set_config('request.jwt.claims', '', true);
+  delete from public.workspace_members where workspace_id = ws_id and user_id = clip_id;
+
+  -- Three jobs, and the ownership of each is chosen so that exactly one policy
+  -- can grant each read. The first version of this section got that wrong:
+  -- the workspace job was owned by the same user who then read it, so it
+  -- passed with the workspace policy dropped — the user_id policy was quietly
+  -- carrying it, and the check proved nothing about the thing it named.
+  --
+  --   job_solo  no workspace, owned by the clipper   -> only the user policy
+  --   job_ws    ws_id,        owned by the clipper   -> only the workspace
+  --                                                     policy can show it to
+  --                                                     the brand
+  --   job_other ws_id,        owned by the brand     -> the clipper is neither
+  --                                                     owner nor member, so
+  --                                                     neither policy applies
+  insert into public.ai_jobs (workspace_id, user_id, kind, status)
+  values (null, clip_id, 'quality_score', 'queued')
+  returning id into job_solo;
+
+  insert into public.ai_jobs (workspace_id, user_id, kind, status)
+  values (ws_id, clip_id, 'transcribe', 'queued')
+  returning id into job_ws;
+
+  insert into public.ai_jobs (workspace_id, user_id, kind, status)
+  values (ws_id, brand_id, 'highlight_detect', 'queued')
+  returning id into job_other;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.ai_jobs where id = job_solo;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('ai jobs', 'clipper reads their own workspace-less job',
+          case when n = 1 then 'PASS' else 'FAIL saw '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.ai_jobs where id = job_solo;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('ai jobs', 'another user CANNOT read that job',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.ai_jobs where id = job_ws;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('ai jobs', 'workspace member reads a job they did not create',
+          case when n = 1 then 'PASS' else 'FAIL saw '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.ai_jobs where id = job_other;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('ai jobs', 'non-member CANNOT read the workspace job',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.ai_jobs (workspace_id, user_id, kind)
+    values (null, clip_id, 'quality_score');
+    msg := 'FAIL insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('ai jobs', 'client CANNOT insert a job', msg);
+
+  -- The money line. If a client could write these, it could mark its own job
+  -- succeeded and bill itself nothing.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  update public.ai_jobs
+     set status = 'succeeded', completed_at = now(), credits_charged = 0
+   where id = job_solo;
+  get diagnostics n = row_count;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('ai jobs', 'client CANNOT mark its own job succeeded',
+          case when n = 0 then 'PASS' else 'FAIL updated '||n end);
+
+  -- Not RLS, but the invariant a poller depends on: a terminal row must carry
+  -- a completion time, or it looks in-flight for ever.
+  begin
+    update public.ai_jobs set status = 'succeeded' where id = job_other;
+    msg := 'FAIL terminal status without completed_at allowed';
+  exception when check_violation then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  insert into rls_results(area, check_name, outcome)
+  values ('ai jobs', 'succeeded REQUIRES completed_at', msg);
+
+  ---------------------------------------------------------------------------
+  -- 10. Brand voice. Workspace-scoped, members manage it, nobody else sees it.
+  ---------------------------------------------------------------------------
+  insert into public.brand_voice (workspace_id, tone, banned_terms)
+  values (ws_id, 'Direct, dry', array['revolutionary','game-changing'])
+  on conflict (workspace_id) do update set tone = excluded.tone;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.brand_voice where workspace_id = ws_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('brand voice', 'workspace member reads the brand voice',
+          case when n = 1 then 'PASS' else 'FAIL saw '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.brand_voice where workspace_id = ws_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('brand voice', 'non-member CANNOT read the brand voice',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.brand_voice (workspace_id, tone)
+    values (ws_id, 'Whatever the clipper wants');
+    msg := 'FAIL insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when unique_violation then msg := 'FAIL row was visible enough to collide';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('brand voice', 'non-member CANNOT write the brand voice', msg);
+
+  ---------------------------------------------------------------------------
+  -- 11. Source assets. The interesting part is not membership — it is the
+  --     split between what the brand owns and what the pipeline owns. A member
+  --     may upload and rename; only the pipeline may declare a file
+  --     transcribed. RLS cannot express "every column except these five", so a
+  --     trigger does, and a trigger is exactly the kind of thing that silently
+  --     stops working.
+  --
+  --     The clipper is still a non-member here, removed in section 9.
+  ---------------------------------------------------------------------------
+  insert into public.source_assets (workspace_id, uploaded_by, storage_path, filename)
+  values (ws_id, brand_id, ws_id || '/rls-suite/episode.mp4', 'episode.mp4')
+  returning id into subj_id;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.source_assets where id = subj_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'workspace member reads the asset',
+          case when n = 1 then 'PASS' else 'FAIL saw '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.source_assets where id = subj_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'non-member CANNOT read the asset',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  -- Renaming is the brand's business.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    update public.source_assets set filename = 'renamed.mp4' where id = subj_id;
+    get diagnostics n = row_count;
+    msg := case when n = 1 then 'PASS' else 'FAIL updated '||n end;
+  exception when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'member CAN rename their own asset', msg);
+
+  -- The one that matters. A member who could set status and transcript could
+  -- hand the highlight detector a script it never transcribed.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    update public.source_assets
+       set status = 'ready', transcript = '{"forged": true}'::jsonb
+     where id = subj_id;
+    msg := 'FAIL member set status and transcript';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'member CANNOT write pipeline columns', msg);
+
+  -- The pipeline runs with no auth.uid(), which is what the trigger keys on.
+  perform set_config('request.jwt.claims', '', true);
+  begin
+    update public.source_assets
+       set status = 'ready', transcript = '{"segments": []}'::jsonb, duration_seconds = 5400
+     where id = subj_id;
+    get diagnostics n = row_count;
+    msg := case when n = 1 then 'PASS' else 'FAIL updated '||n end;
+  exception when others then msg := 'FAIL ' || sqlstate || ' ' || left(sqlerrm, 60);
+  end;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'the pipeline CAN write those columns', msg);
+
+  -- An insert is only allowed in the state an upload really starts in.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.source_assets
+      (workspace_id, uploaded_by, storage_path, filename, status, transcript)
+    values (ws_id, brand_id, ws_id || '/rls-suite/forged.mp4', 'forged.mp4',
+            'ready', '{"forged": true}'::jsonb);
+    msg := 'FAIL insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'CANNOT register an asset as already ready', msg);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.source_assets (workspace_id, uploaded_by, storage_path, filename)
+    values (ws_id, clip_id, ws_id || '/rls-suite/outsider.mp4', 'outsider.mp4');
+    msg := 'FAIL insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'non-member CANNOT register an asset', msg);
 
 end $$;
 

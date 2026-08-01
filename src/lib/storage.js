@@ -10,12 +10,15 @@
 //   brand-assets  private. createSignedUrl. Licensed fonts and music carry
 //                 redistribution terms, so a permanent public URL is wrong —
 //                 a leaked link would be ungoverned forever.
+//   source-assets private, and uploaded differently from the other two. See
+//                 createSourceAssetUploadUrl below.
 //
-// storage.objects has its own RLS, separate from the table policies. Both are
-// workspace-scoped on the object key's first path segment.
+// storage.objects has its own RLS, separate from the table policies. All three
+// are workspace- or user-scoped on the object key's first path segment.
 
 export const AVATARS_BUCKET = "avatars";
 export const BRAND_ASSETS_BUCKET = "brand-assets";
+export const SOURCE_ASSETS_BUCKET = "source-assets";
 
 // Signed URLs are short-lived on purpose: long enough to click, short enough
 // that a copied link stops working.
@@ -94,4 +97,54 @@ export async function signBrandAssetUrls(supabase, storagePaths, expiresIn = SIG
 
 export async function removeBrandAsset(supabase, storagePath) {
   return supabase.storage.from(BRAND_ASSETS_BUCKET).remove([storagePath]);
+}
+
+/**
+ * Build the object key for a source asset. The first segment is the workspace
+ * id because the storage.objects policies read it; the second is the row id, so
+ * two uploads of the same filename cannot collide and the object can always be
+ * traced back to its row.
+ */
+export function sourceAssetPath(workspaceId, assetId, filename) {
+  const safeName = (filename ?? "upload").replace(/[^a-zA-Z0-9._-]/g, "-").slice(-120);
+  return `${workspaceId}/${assetId}/${safeName}`;
+}
+
+/**
+ * Mint a one-shot upload URL for a source asset.
+ *
+ * Unlike avatars and brand assets, the file never passes through the server.
+ * A source asset is a 90-minute podcast, and a Vercel function has a request
+ * body limit and a wall-clock limit that a multi-gigabyte upload will not
+ * respect. So the server mints a signed URL and the browser PUTs straight to
+ * storage with `uploadToSignedUrl`.
+ *
+ * Pass the RLS-scoped server client, not the admin client: the signed URL
+ * inherits the caller's permissions, so the storage.objects insert policy still
+ * decides whether this workspace may write here. Using the service-role client
+ * would mint a URL that bypasses that check.
+ */
+export async function createSourceAssetUploadUrl(supabase, storagePath) {
+  const { data, error } = await supabase.storage
+    .from(SOURCE_ASSETS_BUCKET)
+    .createSignedUploadUrl(storagePath);
+
+  return { token: data?.token ?? null, signedUrl: data?.signedUrl ?? null, error };
+}
+
+/**
+ * Time-limited playback/download URL. Longer TTL than the brand-asset one:
+ * these get scrubbed through in a player while picking highlights, and a link
+ * expiring mid-watch is worse than the marginal exposure.
+ */
+export async function signSourceAssetUrl(supabase, storagePath, expiresIn = 60 * 60) {
+  const { data, error } = await supabase.storage
+    .from(SOURCE_ASSETS_BUCKET)
+    .createSignedUrl(storagePath, expiresIn);
+
+  return { url: data?.signedUrl ?? null, error };
+}
+
+export async function removeSourceAsset(supabase, storagePath) {
+  return supabase.storage.from(SOURCE_ASSETS_BUCKET).remove([storagePath]);
 }

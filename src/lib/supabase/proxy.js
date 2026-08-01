@@ -19,6 +19,7 @@ const PROTECTED_PATH_PREFIXES = [
   "/reviews",
   "/messages",
   "/submissions",
+  "/studio",
 ];
 
 export async function updateSession(request) {

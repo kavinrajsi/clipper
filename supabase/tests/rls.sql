@@ -1051,6 +1051,24 @@ begin
   insert into rls_results(area, check_name, outcome)
   values ('highlights', 'member CANNOT rewrite the moment', msg);
 
+  -- Added after the fact: the original guard protected the moment but not
+  -- campaign_id, so a member could point a moment at any campaign they liked —
+  -- including one in another workspace, since the update policy only checks
+  -- membership of the *asset*. Linking is what brief generation does, and that
+  -- is pipeline work.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    update public.highlight_candidates set campaign_id = c_public where id = job_solo;
+    msg := 'FAIL member linked a moment to a campaign';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('highlights', 'member CANNOT link a moment to a campaign', msg);
+
   set local role authenticated;
   perform set_config('request.jwt.claims',
     json_build_object('sub', brand_id, 'role','authenticated')::text, true);

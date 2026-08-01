@@ -33,6 +33,7 @@ export function HighlightCandidatesList({ asset, candidates, canManage }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
 
   const selectedCount = candidates.filter((c) => c.selected).length;
@@ -52,6 +53,25 @@ export function HighlightCandidatesList({ asset, candidates, canManage }) {
 
     toast.success(`Found ${result.candidates} moments.`);
     router.refresh();
+  }
+
+  async function handleCreateCampaign() {
+    setCreating(true);
+    setError(null);
+
+    const response = await fetch(`/api/ai/assets/${asset.id}/brief`, { method: "POST" });
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      setCreating(false);
+      setError(result?.error ?? "Could not write the brief.");
+      return;
+    }
+
+    toast.success("Draft campaign created — set a rate and fund it.");
+    // Straight to the campaign: the brief is written, but the money is still
+    // the brand's decision and the campaign cannot go live until they fund it.
+    router.push(`/campaigns/${result.campaignId}`);
   }
 
   async function togglePick(candidate) {
@@ -117,10 +137,21 @@ export function HighlightCandidatesList({ asset, candidates, canManage }) {
         </p>
 
         {canManage ? (
-          <Button variant="outline" size="sm" onClick={handleDetect} disabled={running}>
-            {running ? <Spinner /> : null}
-            {running ? "Working…" : "Find again"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleDetect} disabled={running || creating}>
+              {running ? <Spinner /> : null}
+              {running ? "Working…" : "Find again"}
+            </Button>
+
+            {selectedCount > 0 ? (
+              <Button size="sm" onClick={handleCreateCampaign} disabled={creating || running}>
+                {creating ? <Spinner /> : null}
+                {creating
+                  ? "Writing the brief…"
+                  : `Create campaign from ${selectedCount} moment${selectedCount === 1 ? "" : "s"}`}
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
 

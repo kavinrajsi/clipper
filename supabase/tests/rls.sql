@@ -881,6 +881,113 @@ begin
   insert into rls_results(area, check_name, outcome)
   values ('brand voice', 'non-member CANNOT write the brand voice', msg);
 
+  ---------------------------------------------------------------------------
+  -- 11. Source assets. The interesting part is not membership — it is the
+  --     split between what the brand owns and what the pipeline owns. A member
+  --     may upload and rename; only the pipeline may declare a file
+  --     transcribed. RLS cannot express "every column except these five", so a
+  --     trigger does, and a trigger is exactly the kind of thing that silently
+  --     stops working.
+  --
+  --     The clipper is still a non-member here, removed in section 9.
+  ---------------------------------------------------------------------------
+  insert into public.source_assets (workspace_id, uploaded_by, storage_path, filename)
+  values (ws_id, brand_id, ws_id || '/rls-suite/episode.mp4', 'episode.mp4')
+  returning id into subj_id;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.source_assets where id = subj_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'workspace member reads the asset',
+          case when n = 1 then 'PASS' else 'FAIL saw '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.source_assets where id = subj_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'non-member CANNOT read the asset',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  -- Renaming is the brand's business.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    update public.source_assets set filename = 'renamed.mp4' where id = subj_id;
+    get diagnostics n = row_count;
+    msg := case when n = 1 then 'PASS' else 'FAIL updated '||n end;
+  exception when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'member CAN rename their own asset', msg);
+
+  -- The one that matters. A member who could set status and transcript could
+  -- hand the highlight detector a script it never transcribed.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    update public.source_assets
+       set status = 'ready', transcript = '{"forged": true}'::jsonb
+     where id = subj_id;
+    msg := 'FAIL member set status and transcript';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'member CANNOT write pipeline columns', msg);
+
+  -- The pipeline runs with no auth.uid(), which is what the trigger keys on.
+  perform set_config('request.jwt.claims', '', true);
+  begin
+    update public.source_assets
+       set status = 'ready', transcript = '{"segments": []}'::jsonb, duration_seconds = 5400
+     where id = subj_id;
+    get diagnostics n = row_count;
+    msg := case when n = 1 then 'PASS' else 'FAIL updated '||n end;
+  exception when others then msg := 'FAIL ' || sqlstate || ' ' || left(sqlerrm, 60);
+  end;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'the pipeline CAN write those columns', msg);
+
+  -- An insert is only allowed in the state an upload really starts in.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.source_assets
+      (workspace_id, uploaded_by, storage_path, filename, status, transcript)
+    values (ws_id, brand_id, ws_id || '/rls-suite/forged.mp4', 'forged.mp4',
+            'ready', '{"forged": true}'::jsonb);
+    msg := 'FAIL insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'CANNOT register an asset as already ready', msg);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.source_assets (workspace_id, uploaded_by, storage_path, filename)
+    values (ws_id, clip_id, ws_id || '/rls-suite/outsider.mp4', 'outsider.mp4');
+    msg := 'FAIL insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('source assets', 'non-member CANNOT register an asset', msg);
+
 end $$;
 
 select area, check_name, outcome from rls_results order by ord;

@@ -33,6 +33,7 @@ import {
   MessagesSquareIcon,
   UsersRoundIcon,
   PaperclipIcon,
+  FilmIcon,
   SettingsIcon,
 } from "lucide-react"
 
@@ -119,6 +120,11 @@ const brandNavMain = [
     title: "Brand Profile",
     url: "/brand-profile",
     icon: <Building2Icon />,
+  },
+  {
+    title: "Studio",
+    url: "/studio",
+    icon: <FilmIcon />,
   },
   {
     title: "Brand assets",

@@ -59,6 +59,16 @@ Trigger functions never need EXECUTE (the trigger mechanism does not check it), 
 
 Related: `eslint.config.mjs` enables `no-undef` because `next build` does not render dynamic Server Components and so will not catch a `ReferenceError` in one — that shipped once too.
 
+## The AI pipeline (Phase 3)
+
+`ai_jobs` is the queue — there is no job runner, no worker, and AI work cannot run inside a request. Every AI feature enqueues a row and something completes it later.
+
+- **All writes go through `src/lib/ai/jobs.js` on a service-role client.** `ai_jobs` has no client insert/update/delete policy at all, same rule as `campaign_payouts`: `status`, `model`, `tokens_used` and `credits_charged` are the provider's account of what happened and what it cost. Every transition filters on the open states, so a replayed webhook or a racing poller is a no-op rather than an overwrite.
+- **`source_assets` is written by both the user and the pipeline**, and a trigger enforces the split: a signed-in user may rename an asset, but only the pipeline (where `auth.uid()` is null) may write `status`, `transcript`, `duration_seconds`, `storage_path` or `workspace_id`.
+- **Transcription is poll-first.** `/api/cron/ai-jobs` is the mechanism; the Sarvam webhook is a latency optimisation that can be dropped. Sarvam's callback carries a job state and **no transcript**, so both paths run the same `reconcileJob`, which fetches the transcript itself. The poller also sweeps jobs whose relay died — nothing else can, because the terminal-status-requires-`completed_at` constraint means a `running` row with a dead owner sits there forever.
+- **`/api/ai/webhook/*` must stay out of `PROTECTED_PATH_PREFIXES`.** Sarvam arrives unauthenticated; auth is a constant-time token compare, the same shape as the Razorpay webhook's signature check. Proxying it would redirect every delivery to `/login`.
+- **`src/lib/ai/providers/sarvam.js` has never been executed.** It was written from Sarvam's docs and official skills repo with no API key available. `npm run sarvam:probe` is what turns it from written into working — treat its request/response shapes as unverified until that passes. `prepareAudio()` is an intentional no-op seam: if the probe shows video is rejected, ffmpeg extraction goes there and nowhere else.
+
 ## Blocked on somebody else's dashboard
 
 `docs/manual-steps.md` lists the things that cannot be fixed with a migration or

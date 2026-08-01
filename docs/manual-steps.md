@@ -8,9 +8,27 @@ Delete an entry once it is done.
 
 ---
 
-## 1. Ask Razorpay to enable Route **and** Direct Transfers
+## 1. Ask Razorpay to enable Route **and** Direct Transfers — ⏸ ON HOLD
 
-**Blocks:** every payout. Also the wallet, subscriptions, and
+**On hold by decision, 2026-08-01. Do not send without checking first.** The
+draft below is kept ready, not abandoned — everything in it stays accurate.
+
+**Consequences while it is held**, so nobody rediscovers these as bugs:
+
+- **Creator payouts cannot run at all.** `createLinkedAccount()` and
+  `createHeldTransfer()` in `src/lib/razorpay.js` target endpoints that 400 on
+  this account. Brands can fund a campaign; nobody can be paid out of it. This
+  is a product-level gap, not a code defect — do not debug that code assuming it
+  once worked.
+- Phase 4's wallet and subscriptions stay blocked, along with
+  `docs/product/sql/04-monetisation.sql`.
+- Underspend still has no path back to the brand. Refunds *do* work (core API,
+  partial refunds supported), so that is buildable today independently of this
+  ticket — see the gaps list in `AGENTS.md`.
+- Anything that needs a released payout stays untestable end to end, including
+  ratings and reviews, which are gated on one at the RLS level.
+
+**Blocks (when unheld):** every payout. Also the wallet, subscriptions, and
 `docs/product/sql/04-monetisation.sql`.
 
 `npm run razorpay:probe` confirms the keys are real and core payments work, but

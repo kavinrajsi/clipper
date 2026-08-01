@@ -72,7 +72,43 @@ ticket, not a bug.
 
 ---
 
-## 2. Raise the hosted project's storage upload limit
+## 2. Add the Sarvam and cron environment variables
+
+**Blocks:** transcription (Phase 3 slice 3) end to end, and everything after it —
+highlight detection and brief generation both read the transcript.
+
+The code is written and the routes are live, but four variables do not exist. The
+transcribe route returns **503 "Transcription isn't configured yet"** until the
+first one is set, which is deliberate — an unconfigured pipeline should refuse
+rather than half-run.
+
+| Variable | What it is |
+|---|---|
+| `SARVAM_API_KEY` | Sarvam dashboard → API key. ₹30/hr, ₹45/hr with diarization (we use diarization). ₹1,000 free credits. |
+| `SARVAM_CALLBACK_TOKEN` | Any long random string you choose. Sarvam sends it back as `X-SARVAM-JOB-CALLBACK-TOKEN`; the webhook compares it in constant time. |
+| `NEXT_PUBLIC_SITE_URL` | Public origin, so Sarvam knows where to call back. Without it the webhook is simply not registered and the cron poller does all the work — slower, still correct. |
+| `CRON_SECRET` | Any long random string. `/api/cron/ai-jobs` requires `Authorization: Bearer <it>`. Vercel Cron sends this automatically once the variable exists on the project. |
+
+**Then run `npm run sarvam:probe`.** This matters more than usual:
+`src/lib/ai/providers/sarvam.js` was written against Sarvam's published docs and
+their official skills repo and **has never been executed** — every request and
+response shape in it is a claim. The probe creates a real ten-second job (a tone
+it generates itself, a few paise) and walks the whole flow: init → upload URL →
+PUT with `Content-Length` → start → poll → download. Each failure it prints is a
+place the client guessed wrong.
+
+```bash
+npm run sarvam:probe                 # synthesised audio
+npm run sarvam:probe -- ./clip.mp4   # also answers the MP4 question
+```
+
+**Run it with a real video file at least once.** Whether Sarvam accepts an MP4
+directly is undocumented and decides a real architectural question: if it does,
+`/studio` needs no change; if it does not, ffmpeg audio extraction goes into
+`prepareAudio()` in `src/lib/ai/providers/sarvam.js` and nowhere else — that
+function exists as a seam for exactly this, and currently does nothing.
+
+## 3. Raise the hosted project's storage upload limit
 
 **Blocks:** uploading a real recording in production. Local is already done.
 
@@ -88,7 +124,7 @@ for the local stack.
 
 ---
 
-## 3. Register the local Google OAuth redirect URI
+## 4. Register the local Google OAuth redirect URI
 
 **Blocks:** signing into the local stack through the real login screen.
 
@@ -104,7 +140,7 @@ see "Auth and roles" in `AGENTS.md`.
 
 ---
 
-## 4. Enable leaked-password protection
+## 5. Enable leaked-password protection
 
 Flagged by the Supabase security advisor. Dashboard → Authentication →
 Password settings → enable the HaveIBeenPwned check.

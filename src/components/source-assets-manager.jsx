@@ -116,6 +116,26 @@ export function SourceAssetsManager({ workspaceId, assets, canManage }) {
     }
   }
 
+  async function handleTranscribe(asset) {
+    setBusyId(asset.id);
+    setError(null);
+
+    // Deliberately a POST to a route rather than a direct table write: the row
+    // it needs to change (status) is one only the pipeline may write, and the
+    // work behind it costs money.
+    const response = await fetch(`/api/ai/assets/${asset.id}/transcribe`, { method: "POST" });
+    const result = await response.json().catch(() => null);
+    setBusyId(null);
+
+    if (!response.ok) {
+      setError(result?.error ?? "Could not start transcription.");
+      return;
+    }
+
+    toast.success("Transcribing — this runs in the background.");
+    router.refresh();
+  }
+
   async function handlePlay(asset) {
     setBusyId(asset.id);
     const { url, error: signError } = await signSourceAssetUrl(supabase, asset.storage_path);
@@ -229,6 +249,17 @@ export function SourceAssetsManager({ workspaceId, assets, canManage }) {
                   <Badge variant="destructive">Failed</Badge>
                 ) : asset.status !== "ready" ? (
                   <Badge variant="secondary">{STATUS_LABELS[asset.status] ?? asset.status}</Badge>
+                ) : null}
+
+                {canManage && (asset.status === "uploaded" || asset.status === "failed") ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleTranscribe(asset)}
+                    disabled={busyId === asset.id}
+                  >
+                    {asset.status === "failed" ? "Retry" : "Transcribe"}
+                  </Button>
                 ) : null}
 
                 <Button

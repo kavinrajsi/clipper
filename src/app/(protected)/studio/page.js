@@ -50,9 +50,12 @@ export default async function StudioPage() {
 
   // RLS scopes this to the workspace; the explicit filter keeps the intent
   // visible at the call site.
+  // Explicit columns, and `transcript` is deliberately not among them: a
+  // two-hour diarized transcript is megabytes of jsonb, and select("*") would
+  // ship one per row on a page that only ever renders a filename and a status.
   const { data: assets } = await supabase
     .from("source_assets")
-    .select("*")
+    .select("id, filename, mime_type, size_bytes, duration_seconds, status, error, storage_path, created_at")
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: false });
 

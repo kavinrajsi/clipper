@@ -988,6 +988,105 @@ begin
   insert into rls_results(area, check_name, outcome)
   values ('source assets', 'non-member CANNOT register an asset', msg);
 
+  ---------------------------------------------------------------------------
+  -- 12. Highlight candidates. Same model/human split as source_assets, one
+  --     step further out: the model proposes the moment and its bounds, the
+  --     brand only picks. If a member could rewrite start/end or the quote,
+  --     slice 5 would generate a brief for a moment that never happens in the
+  --     recording — so the interesting checks here are the column guard, not
+  --     membership.
+  --
+  --     The clipper is still a non-member; section 9 removed them.
+  ---------------------------------------------------------------------------
+  insert into public.highlight_candidates
+    (source_asset_id, start_seconds, end_seconds, title, rationale, quote)
+  values (subj_id, 60, 105, 'Pricing claim', 'Stands alone.', 'Nobody tells you this')
+  returning id into job_solo;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.highlight_candidates where id = job_solo;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('highlights', 'workspace member reads candidates',
+          case when n = 1 then 'PASS' else 'FAIL saw '||n end);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.highlight_candidates where id = job_solo;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('highlights', 'non-member CANNOT read candidates',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  -- Picking is the product. This must work.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    update public.highlight_candidates set selected = true where id = job_solo;
+    get diagnostics n = row_count;
+    msg := case when n = 1 then 'PASS' else 'FAIL updated '||n end;
+  exception when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('highlights', 'member CAN pick a moment', msg);
+
+  -- The one that matters: rewriting the moment itself.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    update public.highlight_candidates
+       set start_seconds = 0, end_seconds = 20, quote = 'something never said'
+     where id = job_solo;
+    msg := 'FAIL member rewrote the moment';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('highlights', 'member CANNOT rewrite the moment', msg);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.highlight_candidates
+      (source_asset_id, start_seconds, end_seconds, title)
+    values (subj_id, 0, 30, 'Forged moment');
+    msg := 'FAIL insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('highlights', 'member CANNOT invent a moment', msg);
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', brand_id, 'role','authenticated')::text, true);
+  delete from public.highlight_candidates where id = job_solo;
+  get diagnostics n = row_count;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('highlights', 'member CANNOT delete a moment',
+          case when n = 0 then 'PASS' else 'FAIL deleted '||n end);
+
+  -- Not RLS, but the invariant the player and the brief both assume.
+  begin
+    insert into public.highlight_candidates (source_asset_id, start_seconds, end_seconds)
+    values (subj_id, 90, 30);
+    msg := 'FAIL backwards moment allowed';
+  exception when check_violation then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  insert into rls_results(area, check_name, outcome)
+  values ('highlights', 'a moment CANNOT end before it starts', msg);
+
 end $$;
 
 select area, check_name, outcome from rls_results order by ord;

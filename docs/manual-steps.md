@@ -88,6 +88,7 @@ rather than half-run.
 | `SARVAM_CALLBACK_TOKEN` | Any long random string you choose. Sarvam sends it back as `X-SARVAM-JOB-CALLBACK-TOKEN`; the webhook compares it in constant time. |
 | `NEXT_PUBLIC_SITE_URL` | Public origin, so Sarvam knows where to call back. Without it the webhook is simply not registered and the cron poller does all the work — slower, still correct. |
 | `CRON_SECRET` | Any long random string. `/api/cron/ai-jobs` requires `Authorization: Bearer <it>`. Vercel Cron sends this automatically once the variable exists on the project. |
+| `AI_GATEWAY_API_KEY` | Vercel dashboard → AI Gateway → API keys. Used by highlight detection (slice 4) and every LLM call after it. On a Vercel deployment OIDC can replace it; locally it is needed. Optional companion: `AI_HIGHLIGHT_MODEL` to override the default `anthropic/claude-sonnet-5`. |
 
 **Then run `npm run sarvam:probe`.** This matters more than usual:
 `src/lib/ai/providers/sarvam.js` was written against Sarvam's published docs and
@@ -102,7 +103,14 @@ npm run sarvam:probe                 # synthesised audio
 npm run sarvam:probe -- ./clip.mp4   # also answers the MP4 question
 ```
 
-**Run it with a real video file at least once.** Whether Sarvam accepts an MP4
+Highlight detection has its own split: `npm run highlights:check` already covers
+the transcript flattening, prompt assembly and — the part that matters — the
+validator that decides which proposed moments are worth storing, all with no key
+and no network. What no key can cover is the model call itself, so once
+`AI_GATEWAY_API_KEY` is set, run detection on one real transcript and read the
+moments before trusting the surface.
+
+**Run the Sarvam probe with a real video file at least once.** Whether Sarvam accepts an MP4
 directly is undocumented and decides a real architectural question: if it does,
 `/studio` needs no change; if it does not, ffmpeg audio extraction goes into
 `prepareAudio()` in `src/lib/ai/providers/sarvam.js` and nowhere else — that

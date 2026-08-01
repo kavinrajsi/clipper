@@ -7,10 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify": "npm run lint && npm run build && npm run test:rls",
+    "verify": "npm run lint && npm run build && npm run highlights:check && npm run test:rls",
     "dev:session": "node scripts/dev-session.mjs",
     "razorpay:probe": "bash scripts/razorpay-probe.sh",
     "sarvam:probe": "node scripts/sarvam-probe.mjs",
+    "highlights:check": "node scripts/highlights-check.mjs",
     "test:rls": "bash scripts/rls-test.sh"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.8",
     "@tanstack/react-table": "^8.21.3",
+    "ai": "^7.0.47",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

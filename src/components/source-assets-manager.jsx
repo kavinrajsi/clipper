@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FilmIcon, XIcon } from "lucide-react";
@@ -231,7 +232,9 @@ export function SourceAssetsManager({ workspaceId, assets, canManage }) {
               className="flex items-center justify-between gap-4 rounded-lg border p-3"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{asset.filename}</p>
+                <Link href={`/studio/${asset.id}`} className="truncate text-sm font-medium hover:underline">
+                  {asset.filename}
+                </Link>
                 <p className="text-xs text-muted-foreground">
                   {[
                     STATUS_LABELS[asset.status] ?? asset.status,

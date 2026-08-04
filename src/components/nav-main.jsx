@@ -5,6 +5,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
@@ -27,6 +28,7 @@ export function NavMain({ items }) {
                 {item.icon}
                 <span>{item.title}</span>
               </SidebarMenuButton>
+              {item.badge ? <SidebarMenuBadge>{item.badge}</SidebarMenuBadge> : null}
             </SidebarMenuItem>
           ))}
         </SidebarMenu>

@@ -35,6 +35,7 @@ import {
   PaperclipIcon,
   FilmIcon,
   SettingsIcon,
+  BellIcon,
 } from "lucide-react"
 
 const clipperNavMain = [
@@ -143,13 +144,30 @@ const brandNavMain = [
   },
 ]
 
-export function AppSidebar({ user, profile, isAdmin, workspaces = [], activeWorkspaceId, ...props }) {
+export function AppSidebar({
+  user,
+  profile,
+  isAdmin,
+  workspaces = [],
+  activeWorkspaceId,
+  unreadCount = 0,
+  ...props
+}) {
   const { isMobile, setOpenMobile } = useSidebar()
   const isBrand = profile?.role === "brand"
   const baseNavMain = isBrand ? brandNavMain : clipperNavMain
+  // Built here rather than in the arrays above because the badge is per-render
+  // and those are module-level constants.
+  const notificationsItem = {
+    title: "Notifications",
+    url: "/notifications",
+    icon: <BellIcon />,
+    // Same convention as the header bell, so the two counts never disagree.
+    badge: unreadCount > 0 ? (unreadCount > 9 ? "9+" : unreadCount) : null,
+  }
   const navMain = isAdmin
-    ? [...baseNavMain, { title: "Admin", url: "/admin", icon: <ShieldIcon /> }]
-    : baseNavMain
+    ? [...baseNavMain, notificationsItem, { title: "Admin", url: "/admin", icon: <ShieldIcon /> }]
+    : [...baseNavMain, notificationsItem]
   const homeUrl = isBrand ? "/campaigns" : "/dashboard"
 
   return (

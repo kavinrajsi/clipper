@@ -53,6 +53,7 @@ export default async function ProtectedLayout({ children }) {
         isAdmin={isSuperAdmin(user)}
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspace?.id}
+        unreadCount={unreadCount ?? 0}
       />
       <SidebarInset>
         <SiteHeader

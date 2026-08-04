@@ -107,7 +107,10 @@ export async function fetchChannel(accessToken) {
 }
 
 export async function fetchAllUploadedVideos(accessToken, uploadsPlaylistId) {
-  const videoIds = [];
+  // A Set, not an array: paging through the uploads playlist can return the
+  // same video on more than one page, and a repeat that lands in two different
+  // 50-id batches below would produce two rows for one video.
+  const seenVideoIds = new Set();
   let pageToken = "";
 
   do {
@@ -119,10 +122,12 @@ export async function fetchAllUploadedVideos(accessToken, uploadsPlaylistId) {
 
     const data = await googleGet(url.toString(), accessToken);
     for (const item of data.items ?? []) {
-      videoIds.push(item.contentDetails.videoId);
+      seenVideoIds.add(item.contentDetails.videoId);
     }
     pageToken = data.nextPageToken ?? "";
   } while (pageToken);
+
+  const videoIds = [...seenVideoIds];
 
   const videos = [];
   for (let i = 0; i < videoIds.length; i += 50) {

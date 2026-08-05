@@ -1,10 +1,15 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { UsersRoundIcon } from "lucide-react";
 import { isSuperAdmin } from "@/lib/admin";
 import { requireRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
+import { resolveView } from "@/lib/view-mode";
 import { ClipperDirectoryCard } from "@/components/clipper-directory-card";
+import { ClipperDirectoryTable } from "@/components/clipper-directory-table";
+import { ViewToggle } from "@/components/view-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -15,7 +20,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 
-export default async function ClippersPage() {
+export default async function ClippersPage({ searchParams }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -47,13 +52,21 @@ export default async function ClippersPage() {
 
   const profileById = Object.fromEntries(profiles.map((profile) => [profile.id, profile]));
 
+  const [params, cookieStore] = await Promise.all([searchParams, cookies()]);
+  const view = resolveView(params?.view, cookieStore);
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">Clippers</h1>
-        <p className="text-sm text-muted-foreground">
-          Browse clipper profiles to find the right fit for your campaign.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Clippers</h1>
+          <p className="text-sm text-muted-foreground">
+            Browse clipper profiles to find the right fit for your campaign.
+          </p>
+        </div>
+        <Suspense fallback={null}>
+          <ViewToggle view={view} />
+        </Suspense>
       </div>
       {/* An empty screen is an invitation to act, so the zero-result state
           points at /discover — the public directory has creators this
@@ -76,6 +89,13 @@ export default async function ClippersPage() {
             </Button>
           </EmptyContent>
         </Empty>
+      ) : view === "table" ? (
+        <ClipperDirectoryTable
+          creators={clipperProfiles.map((clipperProfile) => ({
+            clipperProfile,
+            profile: profileById[clipperProfile.user_id],
+          }))}
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {clipperProfiles.map((clipperProfile) => (

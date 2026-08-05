@@ -1,9 +1,16 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { BookmarkIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { withBrandInfo } from "@/lib/campaigns";
+import { resolveView } from "@/lib/view-mode";
 import { CampaignCard } from "@/components/campaign-card";
+import { CampaignTable } from "@/components/campaign-table";
 import { ClipperDirectoryCard } from "@/components/clipper-directory-card";
+import { ClipperDirectoryTable } from "@/components/clipper-directory-table";
+import { ViewToggle } from "@/components/view-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -73,10 +80,15 @@ async function getSavedCampaigns(supabase, userId) {
     (applications ?? []).map((a) => [a.campaign_id, a.status])
   );
 
-  return { campaigns: ids.filter((id) => byId[id]).map((id) => byId[id]), applicationByCampaign };
+  // Preserve save order, then attach the brand. The card hides the brand line
+  // when it is missing, so this gap was invisible until the table gave it a
+  // column of its own.
+  const ordered = ids.filter((id) => byId[id]).map((id) => byId[id]);
+
+  return { campaigns: await withBrandInfo(supabase, ordered), applicationByCampaign };
 }
 
-export default async function SavedPage() {
+export default async function SavedPage({ searchParams }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -98,16 +110,26 @@ export default async function SavedPage() {
         .order("position", { ascending: true }),
     ]);
 
+  const [params, cookieStore] = await Promise.all([searchParams, cookies()]);
+  const view = resolveView(params?.view, cookieStore);
+  // Both wrappers widen together, or the header stops lining up with the tabs.
+  const container = view === "table" ? "mx-auto w-full max-w-6xl" : "mx-auto w-full max-w-3xl";
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div className="mx-auto w-full max-w-3xl">
-        <h1 className="text-2xl font-bold">Saved</h1>
-        <p className="text-sm text-muted-foreground">
-          Creators and campaigns you&apos;ve bookmarked. Only you can see this.
-        </p>
+      <div className={`${container} flex items-start justify-between gap-4`}>
+        <div>
+          <h1 className="text-2xl font-bold">Saved</h1>
+          <p className="text-sm text-muted-foreground">
+            Creators and campaigns you&apos;ve bookmarked. Only you can see this.
+          </p>
+        </div>
+        <Suspense fallback={null}>
+          <ViewToggle view={view} />
+        </Suspense>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl">
+      <div className={container}>
         <Tabs defaultValue="creators">
           <TabsList>
             <TabsTrigger value="creators">Creators ({creators.length})</TabsTrigger>
@@ -130,6 +152,18 @@ export default async function SavedPage() {
                   Find creators
                 </Button>
               </Empty>
+            ) : view === "table" ? (
+              <ClipperDirectoryTable
+                creators={creators.map(({ profile, account, verification, stats }) => ({
+                  clipperProfile: profile,
+                  profile: account,
+                  verification,
+                  stats,
+                  saved: true,
+                }))}
+                showSave
+                isAuthenticated
+              />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {creators.map(({ profile, account, verification, stats }) => (
@@ -164,6 +198,15 @@ export default async function SavedPage() {
                   Browse campaigns
                 </Button>
               </Empty>
+            ) : view === "table" ? (
+              <CampaignTable
+                campaigns={campaigns}
+                role="clipper"
+                applicationByCampaign={applicationByCampaign}
+                // Everything on this page is saved by definition.
+                savedCampaignIds={new Set(campaigns.map((campaign) => campaign.id))}
+                portfolioItems={portfolioItems ?? []}
+              />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {campaigns.map((campaign) => (

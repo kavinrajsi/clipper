@@ -39,7 +39,7 @@ function getPageTitle(pathname) {
   return prefix ? PAGE_TITLES[prefix] : "Dashboard"
 }
 
-export function SiteHeader({ notifications = [], unreadCount = 0 }) {
+export function SiteHeader() {
   const pathname = usePathname()
   const title = getPageTitle(pathname)
 
@@ -57,10 +57,7 @@ export function SiteHeader({ notifications = [], unreadCount = 0 }) {
           </BreadcrumbList>
         </Breadcrumb>
         <div className="ml-auto">
-          <NotificationBell
-            initialNotifications={notifications}
-            initialUnread={unreadCount}
-          />
+          <NotificationBell />
         </div>
       </div>
     </header>

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
 const PROTECTED_PATH_PREFIXES = [
+  "/onboarding",
   "/profile",
   "/connectors",
   "/dashboard",

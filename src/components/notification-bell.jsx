@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { BellIcon } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { useNotifications } from "@/components/notification-provider";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -16,38 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function NotificationBell({ initialNotifications = [], initialUnread = 0 }) {
-  const supabase = createClient();
-  const router = useRouter();
-  const [items, setItems] = useState(initialNotifications);
-  const [unread, setUnread] = useState(initialUnread);
-
-  async function markAllRead() {
-    if (unread === 0) return;
-    // Optimistic — this is a read receipt, not a destructive action.
-    const previous = items;
-    const now = new Date().toISOString();
-    setItems(items.map((i) => ({ ...i, read_at: i.read_at ?? now })));
-    setUnread(0);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from("notifications")
-      .update({ read_at: now })
-      .eq("user_id", user.id)
-      .is("read_at", null);
-
-    if (error) {
-      setItems(previous);
-      setUnread(previous.filter((i) => !i.read_at).length);
-      return;
-    }
-    router.refresh();
-  }
+// State and the Realtime subscription live in NotificationProvider so the
+// sidebar badge reads the same counter — see the note there on why this cannot
+// be props plus router.refresh().
+export function NotificationBell() {
+  const { notifications: items, unread, markAllRead } = useNotifications();
 
   return (
     <DropdownMenu onOpenChange={(open) => open && markAllRead()}>

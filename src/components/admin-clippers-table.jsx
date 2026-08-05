@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { AdminRoleAction } from "@/components/admin-role-action"
 import { Badge } from "@/components/ui/badge"
 import {
   Sheet,
@@ -109,6 +110,14 @@ export function AdminClippersTable({ clippers }) {
                   <p>{selected.bio}</p>
                 </div>
               )}
+              <div className="flex flex-col gap-1 border-t pt-4 text-sm">
+                <span className="text-muted-foreground">Account type</span>
+                <AdminRoleAction
+                  userId={selected.id}
+                  currentRole="clipper"
+                  onDone={() => setSelected(null)}
+                />
+              </div>
             </div>
           )}
         </SheetContent>

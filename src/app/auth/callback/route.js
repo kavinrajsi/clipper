@@ -10,9 +10,7 @@ export async function GET(request) {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      const next = explicitNext?.startsWith("/")
-        ? explicitNext
-        : await getDefaultDestination(supabase, data.user.id);
+      const next = await resolveDestination(supabase, data.user.id, explicitNext);
       return NextResponse.redirect(`${origin}${next}`);
     }
   }
@@ -20,12 +18,19 @@ export async function GET(request) {
   return NextResponse.redirect(`${origin}/login?error=auth-code-error`);
 }
 
-async function getDefaultDestination(supabase, userId) {
+async function resolveDestination(supabase, userId, explicitNext) {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, role_chosen_at")
     .eq("id", userId)
     .single();
 
-  return profile?.role === "brand" ? "/campaigns" : "/dashboard";
+  // Overrides `next`, rather than sitting behind it. A proxy-set
+  // next=/dashboard would otherwise skip the picker here and only meet it a
+  // moment later via the protected layout's gate — one wasted round trip and a
+  // page flash on the way.
+  if (!profile?.role_chosen_at) return "/onboarding/role";
+
+  if (explicitNext?.startsWith("/")) return explicitNext;
+  return profile.role === "brand" ? "/campaigns" : "/dashboard";
 }

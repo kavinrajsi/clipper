@@ -57,6 +57,8 @@ declare
   job_solo  uuid;
   job_ws    uuid;
   job_other uuid;
+  mate_id   uuid;
+  n2        int;
   had_policy boolean;
 
   procedure_note text;
@@ -369,6 +371,179 @@ begin
           case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
 
   ---------------------------------------------------------------------------
+  -- 6a-bis. Account type is chosen once and locked.
+  --
+  --   Every case sets role_chosen_at itself rather than trusting the fixture.
+  --   The migration's backfill runs against an empty table (migrations come
+  --   before seed.sql), so a case that assumed the seeded users were locked
+  --   would take the first-pick-allowed branch and report PASS while asserting
+  --   nothing at all.
+  ---------------------------------------------------------------------------
+
+  -- `reset role` does NOT clear request.jwt.claims, so auth.uid() is still
+  -- whoever the previous section impersonated — and the guard trigger keys off
+  -- exactly that. The suite's own setup writes have to run with it cleared or
+  -- they hit the lock themselves.
+  perform set_config('request.jwt.claims', '', true);
+
+  -- Locked. The clipper tries to promote themselves to brand.
+  update public.profiles set role_chosen_at = now() where id = clip_id;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    update public.profiles set role = 'brand' where id = clip_id;
+    msg := 'FAIL role change allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('account type', 'user CANNOT change their own role once chosen', msg);
+
+  -- The regression that would break every /profile save: the form still sends
+  -- the row, just not a different role.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    update public.profiles set full_name = 'Renamed', role = 'clipper' where id = clip_id;
+    msg := 'PASS';
+  exception when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('account type', 'user CAN still edit their name', msg);
+
+  -- Clearing the flag is how you would reopen the pick. It must be refused,
+  -- and the value must survive the attempt.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    update public.profiles set role_chosen_at = null where id = clip_id;
+    msg := 'FAIL unlock allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  select count(*) into n from public.profiles
+   where id = clip_id and role_chosen_at is not null;
+  insert into rls_results(area, check_name, outcome)
+  values ('account type', 'user CANNOT unlock their own role',
+          case when msg <> 'PASS' then msg
+               when n = 1 then 'PASS'
+               else 'FAIL flag was cleared' end);
+
+  -- A fresh signup, made the way one actually happens: an auth.users insert
+  -- with no 'role' metadata key, exactly what Google OAuth produces.
+  -- on_auth_user_created -> handle_new_user is what creates the profile, so
+  -- this asserts the new-user half of the migration rather than simulating it.
+  mate_id := gen_random_uuid();
+  insert into auth.users (id, email, aud, role, raw_user_meta_data, created_at, updated_at)
+  values (mate_id, 'rls-suite-newuser@seed.local', 'authenticated', 'authenticated',
+          '{"full_name":"RLS Suite Newcomer"}'::jsonb, now(), now());
+
+  select count(*) into n from public.profiles
+   where id = mate_id and role = 'clipper' and role_chosen_at is null;
+  insert into rls_results(area, check_name, outcome)
+  values ('account type', 'a Google signup arrives unchosen',
+          case when n = 1 then 'PASS' else 'FAIL not unchosen' end);
+
+  -- The other half: a signup that DOES carry the key was chosen deliberately
+  -- (seed.sql and scripts/dev-session.mjs are the only two). If this regresses,
+  -- every local fixture becomes unchosen, the gate redirects them all to the
+  -- picker, and the lock cases above quietly test the wrong branch.
+  declare meta_id uuid := gen_random_uuid();
+  begin
+    insert into auth.users (id, email, aud, role, raw_user_meta_data, created_at, updated_at)
+    values (meta_id, 'rls-suite-chosen@seed.local', 'authenticated', 'authenticated',
+            '{"full_name":"RLS Suite Chosen","role":"brand"}'::jsonb, now(), now());
+
+    select count(*) into n from public.profiles
+     where id = meta_id and role = 'brand' and role_chosen_at is not null;
+    insert into rls_results(area, check_name, outcome)
+    values ('account type', 'a signup with an explicit role arrives chosen',
+            case when n = 1 then 'PASS' else 'FAIL not chosen' end);
+  end;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', mate_id, 'role','authenticated')::text, true);
+  begin
+    update public.profiles set role = 'brand', role_chosen_at = now() where id = mate_id;
+    msg := 'PASS';
+  exception when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('account type', 'a new user CAN pick their role once', msg);
+
+  -- Picking brand has to produce a workspace, or the brand side of the app is
+  -- empty for them. ensure_workspace_for_brand is what does it.
+  select count(*) into n from public.workspaces w where w.owner_id = mate_id;
+  insert into rls_results(area, check_name, outcome)
+  values ('account type', 'picking brand creates a workspace',
+          case when n >= 1 then 'PASS' else 'FAIL no workspace' end);
+
+  -- Picking CLIPPER takes a different branch: role already reads 'clipper' by
+  -- default, so only role_chosen_at moves. A reordering of the guard that still
+  -- let brand through could silently break every clipper signup.
+  declare pick_id uuid := gen_random_uuid();
+  begin
+    perform set_config('request.jwt.claims', '', true);
+    insert into auth.users (id, email, aud, role, raw_user_meta_data, created_at, updated_at)
+    values (pick_id, 'rls-suite-picks-clipper@seed.local', 'authenticated', 'authenticated',
+            '{"full_name":"RLS Suite Clipper Pick"}'::jsonb, now(), now());
+
+    set local role authenticated;
+    perform set_config('request.jwt.claims',
+      json_build_object('sub', pick_id, 'role','authenticated')::text, true);
+    begin
+      update public.profiles set role = 'clipper', role_chosen_at = now() where id = pick_id;
+      msg := 'PASS';
+    exception when others then msg := 'FAIL ' || sqlstate;
+    end;
+    reset role;
+
+    select count(*) into n from public.profiles
+     where id = pick_id and role_chosen_at is not null;
+    insert into rls_results(area, check_name, outcome)
+    values ('account type', 'a new user CAN pick clipper',
+            case when msg <> 'PASS' then msg
+                 when n = 1 then 'PASS'
+                 else 'FAIL flag not set' end);
+  end;
+
+  -- ...and the second attempt is refused, by the same person, immediately.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', mate_id, 'role','authenticated')::text, true);
+  begin
+    update public.profiles set role = 'clipper' where id = mate_id;
+    msg := 'FAIL second change allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('account type', 'CANNOT change it again after picking', msg);
+
+  -- The escape hatch: /api/admin/users/[id]/role runs on the service-role
+  -- client, where auth.uid() is null. If this stops working, a role picked
+  -- wrongly at signup can only be fixed with a psql session against prod.
+  -- Clearing the claims is what makes auth.uid() null — that IS the case.
+  perform set_config('request.jwt.claims', '', true);
+  begin
+    update public.profiles set role = 'clipper' where id = mate_id;
+    msg := 'PASS';
+  exception when others then msg := 'FAIL ' || sqlstate;
+  end;
+  insert into rls_results(area, check_name, outcome)
+  values ('account type', 'the admin client CAN change a locked role', msg);
+
+  ---------------------------------------------------------------------------
   -- 6b. Notifications. Written only by triggers; a client must never be able
   --     to forge one into someone else's bell, nor read another user's.
   ---------------------------------------------------------------------------
@@ -401,6 +576,117 @@ begin
   insert into rls_results(area, check_name, outcome)
   values ('notifications', 'application fires a notification',
           case when n >= 1 then 'PASS' else 'FAIL none' end);
+
+  -- Marking read, one row at a time. The update policy existed from the start
+  -- but nothing exercised it until /notifications got a per-item control.
+  perform set_config('request.jwt.claims', '', true);
+  insert into public.notifications (user_id, kind, title)
+  values (clip_id, 'message_received', 'Probe: mark me read')
+  returning id into subj_id;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  update public.notifications set read_at = now()
+   where id = subj_id and user_id = clip_id and read_at is null;
+  reset role;
+  select count(*) into n from public.notifications
+   where id = subj_id and read_at is not null;
+  insert into rls_results(area, check_name, outcome)
+  values ('notifications', 'user CAN mark their own notification read',
+          case when n = 1 then 'PASS' else 'FAIL not marked' end);
+
+  -- Somebody else's. The policy FILTERS rather than raising, so the statement
+  -- succeeds having touched nothing — asserting "no error" would pass
+  -- vacuously. The row itself has to be re-read.
+  --
+  -- Verified failable, and the result is worth recording: widening the UPDATE
+  -- policy to `using (true)` alone does NOT make this red. An UPDATE with a
+  -- WHERE clause has to read the row first, so the SELECT policy gates it too
+  -- and the write still matches nothing. Both policies have to be widened
+  -- before this turns. Do not "simplify" either one on the assumption that the
+  -- other is what is holding the line.
+  perform set_config('request.jwt.claims', '', true);
+  insert into public.notifications (user_id, kind, title)
+  values (brand_id, 'message_received', 'Probe: not yours')
+  returning id into subj_id;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  update public.notifications set read_at = now() where id = subj_id;
+  get diagnostics n = row_count;
+  reset role;
+
+  select count(*) into n2 from public.notifications
+   where id = subj_id and read_at is null;
+  insert into rls_results(area, check_name, outcome)
+  values ('notifications', 'user CANNOT mark another user''s notification read',
+          case when n <> 0 then 'FAIL updated ' || n || ' row(s)'
+               when n2 = 1 then 'PASS'
+               else 'FAIL read_at was set' end);
+
+  ---------------------------------------------------------------------------
+  -- 6c. Notification preferences. The sound switch on /notifications is the
+  --     first client write this table has ever had, and it upserts — so the
+  --     insert half of the policy matters as much as the update half.
+  ---------------------------------------------------------------------------
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.notification_preferences (user_id, sound_enabled)
+    values (clip_id, false)
+    on conflict (user_id) do update set sound_enabled = excluded.sound_enabled;
+    msg := 'PASS';
+  exception when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('notification_preferences', 'user CAN upsert their own sound setting', msg);
+
+  -- Muting someone else's chime is small, but it is a write into another
+  -- user's settings row and the policy has to refuse it.
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  begin
+    insert into public.notification_preferences (user_id, sound_enabled)
+    values (brand_id, false);
+    msg := 'FAIL insert allowed';
+  exception when insufficient_privilege then msg := 'PASS';
+           when others then msg := 'FAIL ' || sqlstate;
+  end;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('notification_preferences', 'user CANNOT write another user''s settings', msg);
+
+  -- The brand's row, written outside any role so RLS does not apply, must be
+  -- invisible to the clipper.
+  insert into public.notification_preferences (user_id, sound_enabled)
+  values (brand_id, false)
+  on conflict (user_id) do update set sound_enabled = excluded.sound_enabled;
+
+  set local role authenticated;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', clip_id, 'role','authenticated')::text, true);
+  select count(*) into n from public.notification_preferences where user_id = brand_id;
+  reset role;
+  insert into rls_results(area, check_name, outcome)
+  values ('notification_preferences', 'user CANNOT read another user''s settings',
+          case when n = 0 then 'PASS' else 'FAIL leaked '||n end);
+
+  ---------------------------------------------------------------------------
+  -- 6d. Realtime delivery. Not a policy, but the step that gets forgotten:
+  --     without the table in the publication the subscription connects and
+  --     silently receives nothing, which looks exactly like a client bug.
+  ---------------------------------------------------------------------------
+  select count(*) into n from pg_publication_tables
+   where pubname = 'supabase_realtime' and schemaname = 'public'
+     and tablename in ('messages', 'notifications');
+  insert into rls_results(area, check_name, outcome)
+  values ('realtime', 'messages and notifications are replicated',
+          case when n = 2 then 'PASS' else 'FAIL only '||n||' of 2' end);
 
   ---------------------------------------------------------------------------
   -- 7. Bids are visible only to the campaign owner.

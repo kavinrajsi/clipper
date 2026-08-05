@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { AdminRoleAction } from "@/components/admin-role-action"
 import {
   Sheet,
   SheetContent,
@@ -110,6 +111,14 @@ export function AdminBrandsTable({ brands }) {
                   <p>{selected.description}</p>
                 </div>
               )}
+              <div className="flex flex-col gap-1 border-t pt-4 text-sm">
+                <span className="text-muted-foreground">Account type</span>
+                <AdminRoleAction
+                  userId={selected.id}
+                  currentRole="brand"
+                  onDone={() => setSelected(null)}
+                />
+              </div>
             </div>
           )}
         </SheetContent>

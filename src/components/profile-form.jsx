@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { toast } from "sonner"
 
 function getInitials(name, email) {
@@ -48,7 +47,6 @@ export function ProfileForm({ user, profile, className, ...props }) {
   )
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
-  const [role, setRole] = useState(profile?.role ?? "clipper")
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -85,10 +83,12 @@ export function ProfileForm({ user, profile, className, ...props }) {
 
     const { error: updateError } = await supabase
       .from("profiles")
+      // role is deliberately absent. It is chosen once at /onboarding/role and
+      // locked by a trigger; sending it here would make a name-only edit fail
+      // the moment the two values differed.
       .update({
         full_name: fullName,
         avatar_url: nextAvatarUrl,
-        role,
         updated_at: new Date().toISOString(),
       })
       .eq("id", user.id)
@@ -139,20 +139,16 @@ export function ProfileForm({ user, profile, className, ...props }) {
               </div>
             </Field>
             <Field>
-              <FieldLabel>I&apos;m a</FieldLabel>
-              <ToggleGroup
-                value={[role]}
-                onValueChange={(value) => setRole(value[0] ?? "clipper")}
-                variant="outline"
-                className="w-full"
-              >
-                <ToggleGroupItem value="clipper" className="flex-1">
-                  Clipper
-                </ToggleGroupItem>
-                <ToggleGroupItem value="brand" className="flex-1">
-                  Brand
-                </ToggleGroupItem>
-              </ToggleGroup>
+              <FieldLabel htmlFor="account-type">I&apos;m a</FieldLabel>
+              <Input
+                id="account-type"
+                type="text"
+                value={profile?.role === "brand" ? "Brand" : "Clipper"}
+                disabled
+              />
+              <FieldDescription>
+                Chosen when you signed up. Contact support if this is wrong.
+              </FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="full-name">Full Name</FieldLabel>

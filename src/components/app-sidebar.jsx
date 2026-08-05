@@ -7,6 +7,7 @@ import { NavMain } from "@/components/nav-main"
 import { WorkspaceSwitcher } from "@/components/workspace-switcher"
 import { NavUser } from "@/components/nav-user"
 import { Logo } from "@/components/logo"
+import { useNotifications } from "@/components/notification-provider"
 import {
   Sidebar,
   SidebarContent,
@@ -150,10 +151,12 @@ export function AppSidebar({
   isAdmin,
   workspaces = [],
   activeWorkspaceId,
-  unreadCount = 0,
   ...props
 }) {
   const { isMobile, setOpenMobile } = useSidebar()
+  // From context, not a prop, so the badge tracks the header bell live instead
+  // of only on a server re-render.
+  const { unread: unreadCount } = useNotifications()
   const isBrand = profile?.role === "brand"
   const baseNavMain = isBrand ? brandNavMain : clipperNavMain
   // Built here rather than in the arrays above because the badge is per-render

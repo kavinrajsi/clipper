@@ -40,11 +40,17 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# docs ARE committed (architecture + product specs live in docs/).
-# Only this scratch path stays local.
-/docs/local
-
-# supabase (CLI local dev — migrations/config ARE committed, only local state is ignored)
-/supabase/.branches
-/supabase/.temp
-/supabase/.env
+# Kept out of the repo and local-only. These were tracked until now; see the
+# commit that removed them for what this costs.
+#
+# /supabase/ holds the migrations, config.toml, seed.sql and tests/rls.sql.
+# Untracking it means a fresh clone cannot rebuild the database, and
+# `supabase db push` refuses to run at all while a version recorded in the
+# live project's supabase_migrations.schema_migrations has no local file —
+# so anyone pushing a migration needs these files from elsewhere.
+#
+# /scripts/ backs npm run verify, test:rls, dev:session and both probes, so
+# those scripts fail on a fresh clone too.
+/supabase/
+/docs/
+/scripts/

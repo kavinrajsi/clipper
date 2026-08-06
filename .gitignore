@@ -40,17 +40,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Kept out of the repo and local-only. These were tracked until now; see the
-# commit that removed them for what this costs.
+# /supabase/ is tracked again. It was untracked in a93fc4d, and the cost that
+# commit predicted came due: security fixes now live half in application code
+# and half in migrations, and shipping the code without the schema means
+# deploying against a database that has not got the object the code reads.
+# Nothing in here is secret — config.toml takes every credential through
+# env(...), and seed.sql creates local-only fixtures.
 #
-# /supabase/ holds the migrations, config.toml, seed.sql and tests/rls.sql.
-# Untracking it means a fresh clone cannot rebuild the database, and
-# `supabase db push` refuses to run at all while a version recorded in the
-# live project's supabase_migrations.schema_migrations has no local file —
-# so anyone pushing a migration needs these files from elsewhere.
-#
-# /scripts/ backs npm run verify, test:rls, dev:session and both probes, so
-# those scripts fail on a fresh clone too.
-/supabase/
+# /scripts/ and /docs/ are still untracked, so `npm run verify` (which shells
+# out to scripts/rls-test.sh) and the probes still fail on a fresh clone.
 /docs/
 /scripts/

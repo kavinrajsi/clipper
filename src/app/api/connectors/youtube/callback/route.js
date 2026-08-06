@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens, fetchChannel } from "@/lib/youtube";
 
@@ -31,7 +32,11 @@ export async function GET(request) {
     const channel = await fetchChannel(tokens.access_token);
     const tokenExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-    const { error } = await supabase.from("youtube_connections").upsert(
+    // channel_id is what choose-method verifies the "linked" tier against, so a
+    // guard trigger reserves it to the pipeline. This is Google's answer to
+    // fetchChannel() a few lines up, not anything the caller supplied, and the
+    // row is pinned to the authenticated user.id.
+    const { error } = await createAdminClient().from("youtube_connections").upsert(
       {
         user_id: user.id,
         access_token: tokens.access_token,

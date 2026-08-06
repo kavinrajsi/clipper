@@ -3,7 +3,7 @@ import { platformFee, totalChargedToBrand } from "@/lib/commission";
 import { createHeldTransfer } from "@/lib/razorpay";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceRole } from "@/lib/workspaces";
+import { CAMPAIGN_ROLES, getWorkspaceRole } from "@/lib/workspaces";
 import { extractYoutubeVideoId } from "@/lib/youtube";
 
 export async function POST(request, { params }) {
@@ -25,13 +25,31 @@ export async function POST(request, { params }) {
 
   const campaign = submission?.application?.campaign;
 
-  // Approving a submission is creative review, so any workspace member may do
-  // it. The held transfer it creates is not yet a release — that still needs a
-  // money role, enforced in payouts/[id]/release.
+  // Approving a submission is creative review, so it takes a campaign role, not
+  // a money role — releasing the hold is the money step, gated separately in
+  // payouts/[id]/release. But it is not "any member with a pulse" either: this
+  // used to test `role` for truthiness alone, which let `billing` — the role
+  // deliberately excluded from running campaigns — create held transfers.
   const role = campaign ? await getWorkspaceRole(supabase, user, campaign.workspace_id) : null;
 
   if (submissionError || !submission || !campaign || !role) {
     return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+  }
+
+  if (!CAMPAIGN_ROLES.includes(role)) {
+    return NextResponse.json(
+      { error: "Your role on this workspace can't approve submissions." },
+      { status: 403 }
+    );
+  }
+
+  // Idempotency. Without this, N POSTs create N held Razorpay transfers while
+  // the upsert below keeps overwriting one row (the unique index is `nulls not
+  // distinct`), so `committed` never grows and the budget guard never trips.
+  // The extra transfers have no razorpay_transfer_id recorded anywhere, which
+  // means payouts/[id]/release can never release or reverse them.
+  if (submission.status === "approved") {
+    return NextResponse.json({ error: "This submission is already approved." }, { status: 409 });
   }
 
   if (campaign.funding_status !== "paid" || !campaign.razorpay_payment_id) {
@@ -69,20 +87,38 @@ export async function POST(request, { params }) {
   let amount = agreedRate;
 
   if (campaign.payout_structure === "per_view") {
-    let viewCount = submission.view_count_at_submission ?? 0;
+    // view_count_at_submission is written by the clipper's own browser
+    // (submission-form.jsx inserts it directly), so it is a display value, not
+    // an input to a transfer. A per-view payout comes from the synced
+    // youtube_videos row or it does not get computed at all — there is no
+    // fallback, because the fallback was a number the payee chose.
     const videoId = extractYoutubeVideoId(submission.video_url);
 
-    if (videoId) {
-      const { data: video } = await admin
-        .from("youtube_videos")
-        .select("view_count")
-        .eq("user_id", submission.clipper_id)
-        .eq("video_id", videoId)
-        .single();
-      if (video?.view_count != null) viewCount = video.view_count;
+    if (!videoId) {
+      return NextResponse.json(
+        { error: "That submission's URL isn't a YouTube video, so views can't be verified." },
+        { status: 400 }
+      );
     }
 
-    amount = (viewCount / 1000) * agreedRate;
+    const { data: video } = await admin
+      .from("youtube_videos")
+      .select("view_count")
+      .eq("user_id", submission.clipper_id)
+      .eq("video_id", videoId)
+      .single();
+
+    if (video?.view_count == null) {
+      return NextResponse.json(
+        {
+          error:
+            "This video isn't synced yet, so its view count can't be verified. Ask the creator to sync their channel from Connectors, then approve again.",
+        },
+        { status: 400 }
+      );
+    }
+
+    amount = (video.view_count / 1000) * agreedRate;
   }
 
   amount = Math.round(amount * payoutMultiplier * 100) / 100;
@@ -163,10 +199,29 @@ export async function POST(request, { params }) {
     }
   }
 
-  await supabase
+  // Compare-and-swap, and the real idempotency lock — the status check on entry
+  // only catches a sequential retry, not two requests racing. `neq` makes this
+  // the atomic claim: exactly one caller flips submitted -> approved and gets a
+  // row back, and the loser stops here instead of creating a second transfer.
+  //
+  // On the admin client, and the error is checked. It used to run on the
+  // RLS-scoped client with the result discarded entirely, so a refused write
+  // still fell through to createHeldTransfer below.
+  const { data: claimed, error: claimError } = await admin
     .from("campaign_submissions")
     .update({ status: "approved", updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .neq("status", "approved")
+    .select("id");
+
+  if (claimError) {
+    console.error("Submission approval status write failed", claimError);
+    return NextResponse.json({ error: "Couldn't approve this submission." }, { status: 500 });
+  }
+
+  if (!claimed?.length) {
+    return NextResponse.json({ error: "This submission is already approved." }, { status: 409 });
+  }
 
   try {
     // Transfers the creator's amount only. The fee is realised by staying
@@ -209,6 +264,19 @@ export async function POST(request, { params }) {
       },
       { onConflict: "application_id,milestone_id" }
     );
+
+    // Release the claim taken above. Without this the submission stays
+    // `approved` with no held transfer behind it, and the idempotency guard
+    // then refuses every retry — one Razorpay hiccup would strand the payout
+    // permanently with no way back through the UI.
+    const { error: revertError } = await admin
+      .from("campaign_submissions")
+      .update({ status: "submitted", updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (revertError) {
+      console.error("Failed to revert submission status after transfer failure", revertError);
+    }
 
     return NextResponse.json({ error: "Couldn't create the payout transfer." }, { status: 502 });
   }

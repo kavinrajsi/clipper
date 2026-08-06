@@ -57,7 +57,8 @@ export async function PATCH(request, { params }) {
         { status: 400 }
       );
     }
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error("Workspace member role update failed", error);
+    return NextResponse.json({ error: "Couldn't change that member's role." }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true });
@@ -103,7 +104,8 @@ export async function DELETE(request, { params }) {
         { status: 400 }
       );
     }
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    console.error("Workspace member removal failed", error);
+    return NextResponse.json({ error: "Couldn't remove that member." }, { status: 400 });
   }
 
   // Campaigns they created are untouched — they belong to the workspace, which

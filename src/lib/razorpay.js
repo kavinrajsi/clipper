@@ -1,13 +1,28 @@
+import crypto from "node:crypto";
 import Razorpay from "razorpay";
 import { validatePaymentVerification } from "razorpay/dist/utils/razorpay-utils.js";
 
-// Static on the class, not an instance method.
+// Not Razorpay.validateWebhookSignature. That guards with isDefined(secret),
+// and isDefined("") is true — a set-but-empty RAZORPAY_WEBHOOK_SECRET (blank
+// field in the dashboard, `RAZORPAY_WEBHOOK_SECRET=` in an env file, a failed
+// secret sync) sails past it and HMACs with an empty key, at which point anyone
+// can compute a valid signature and forge a payment.captured. It also compares
+// with ===, which is not timing-safe.
+//
+// Fails closed on a missing OR empty secret, and compares the same way
+// /api/cron/ai-jobs and /api/ai/webhook/sarvam already do.
 export function verifyWebhookSignature(rawBody, signature) {
-  return Razorpay.validateWebhookSignature(
-    rawBody,
-    signature,
-    process.env.RAZORPAY_WEBHOOK_SECRET
-  );
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+  if (!secret || !signature) return false;
+
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const actualBuf = Buffer.from(signature, "utf8");
+
+  // timingSafeEqual throws on a length mismatch, so check length first.
+  if (expectedBuf.length !== actualBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, actualBuf);
 }
 
 export function getRazorpayClient() {

@@ -46,6 +46,15 @@ export function BrandProfileForm({ userId, brandProfile, className, ...props }) 
     setError(null)
     setLoading(true)
 
+    // brand_profiles_website_scheme rejects anything that isn't http(s), so
+    // catch the common "typed it without a scheme" case here — otherwise the
+    // user sees the raw constraint name out of Postgres.
+    if (website && !/^https?:\/\/[^\s/]/i.test(website)) {
+      setError("Website has to start with http:// or https://")
+      setLoading(false)
+      return
+    }
+
     let nextLogoUrl = logoUrl
 
     if (selectedFile) {

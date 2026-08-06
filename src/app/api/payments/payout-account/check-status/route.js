@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkAccountActivation } from "@/lib/razorpay";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const STATUS_MAP = {
@@ -36,7 +37,10 @@ export async function POST() {
     );
     const mappedStatus = STATUS_MAP[activationStatus] ?? "pending";
 
-    await supabase
+    // Razorpay's activation verdict — server-owned, and guarded against
+    // authenticated writes, so this needs the service-role client. Ownership
+    // was established by the user_id-scoped read above.
+    await createAdminClient()
       .from("clipper_payout_accounts")
       .update({
         status: mappedStatus,

@@ -32,16 +32,22 @@ export function SubmissionForm({ applicationId }) {
     setError(null)
     setLoading(true)
 
-    let viewCountAtSubmission = null
+    // A per-view payout is computed from the synced youtube_videos row and
+    // nothing else, so a URL that doesn't parse can never be approved. Catch it
+    // here rather than after the creator has done the work.
     const videoId = extractYoutubeVideoId(videoUrl)
-    if (videoId) {
-      const { data: video } = await supabase
-        .from("youtube_videos")
-        .select("view_count")
-        .eq("video_id", videoId)
-        .single()
-      viewCountAtSubmission = video?.view_count ?? null
+    if (!videoId) {
+      setError("Paste a YouTube video URL — for example https://youtube.com/watch?v=dQw4w9WgXcQ")
+      setLoading(false)
+      return
     }
+
+    const { data: video } = await supabase
+      .from("youtube_videos")
+      .select("view_count")
+      .eq("video_id", videoId)
+      .single()
+    const viewCountAtSubmission = video?.view_count ?? null
 
     const { error: insertError } = await supabase.from("campaign_submissions").insert({
       application_id: applicationId,

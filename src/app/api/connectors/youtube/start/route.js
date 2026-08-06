@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { hasAppRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getGoogleAuthUrl } from "@/lib/youtube";
 
@@ -11,6 +12,12 @@ export async function GET(request) {
 
   if (!user) {
     return NextResponse.redirect(new URL("/login?next=/connectors", request.url));
+  }
+
+  // A browser navigation, not a fetch() — so this mirrors what requireRole
+  // does on /connectors rather than returning a 403 body nobody would see.
+  if (!(await hasAppRole(supabase, user, "clipper"))) {
+    return NextResponse.redirect(new URL("/campaigns", request.url));
   }
 
   const state = crypto.randomUUID();

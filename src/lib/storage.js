@@ -34,13 +34,39 @@ const SIGNED_URL_TTL_SECONDS = 60 * 10;
  * accumulates. That is why upsert is on, and also why the URL needs
  * cache-busting below.
  */
+// The avatars bucket is PUBLIC and served from the Supabase storage origin —
+// the same origin storage tokens live on. An SVG or HTML file stored there is
+// script on that origin, so the extension is chosen from a fixed set rather
+// than taken from the filename. The bucket also enforces allowed_mime_types
+// and a size limit (see the avatars-bucket-limits migration); this is the
+// friendly half, so the user gets a real message instead of a storage error.
+const AVATAR_TYPES = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
 export async function uploadPublicImage(supabase, userId, file, stem = "avatar") {
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "png";
+  // Derived from the sniffed type, never from file.name — the old code did
+  // `file.name.split(".").pop()`, unfiltered, and was the only one of the three
+  // upload helpers here with no sanitisation at all.
+  const extension = AVATAR_TYPES[file.type];
+
+  if (!extension) {
+    return { url: null, error: { message: "Upload a PNG, JPEG, WebP or GIF image." } };
+  }
+
+  if (file.size > MAX_AVATAR_BYTES) {
+    return { url: null, error: { message: "That image is larger than 5 MB." } };
+  }
+
   const path = `${userId}/${stem}.${extension}`;
 
   const { error } = await supabase.storage
     .from(AVATARS_BUCKET)
-    .upload(path, file, { upsert: true });
+    .upload(path, file, { upsert: true, contentType: file.type });
 
   if (error) return { url: null, error };
 

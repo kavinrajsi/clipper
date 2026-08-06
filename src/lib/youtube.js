@@ -8,23 +8,45 @@ const SCOPES = [
   "https://www.googleapis.com/auth/yt-analytics.readonly",
 ].join(" ");
 
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+  "youtube-nocookie.com",
+]);
+const SHORT_HOSTS = new Set(["youtu.be"]);
+
+// Every video_id this app ever stores came from the YouTube API, and they are
+// all 11 characters of the URL-safe alphabet.
+const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+
+// Hosts are matched exactly, one leading "www." aside. The old check was
+// hostname.includes("youtu.be"), which youtu.be.attacker.com satisfies, and the
+// ?v= branch tested no host at all — any origin with a ?v= was accepted.
 export function extractYoutubeVideoId(url) {
+  let parsed;
   try {
-    const parsed = new URL(url);
-    if (parsed.hostname.includes("youtu.be")) {
-      return parsed.pathname.slice(1) || null;
-    }
-    if (parsed.searchParams.has("v")) {
-      return parsed.searchParams.get("v");
-    }
-    const shortsMatch = parsed.pathname.match(/\/shorts\/([^/]+)/);
-    if (shortsMatch) {
-      return shortsMatch[1];
-    }
-    return null;
+    parsed = new URL(url);
   } catch {
     return null;
   }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  const valid = (id) => (id && VIDEO_ID.test(id) ? id : null);
+
+  if (SHORT_HOSTS.has(host)) {
+    return valid(parsed.pathname.slice(1).split("/")[0]);
+  }
+  if (!YOUTUBE_HOSTS.has(host)) return null;
+
+  if (parsed.searchParams.has("v")) {
+    return valid(parsed.searchParams.get("v"));
+  }
+
+  const match = parsed.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/);
+  return match ? valid(match[1]) : null;
 }
 
 export function getGoogleAuthUrl(state, redirectUri) {

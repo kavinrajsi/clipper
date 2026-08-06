@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createLinkedAccount } from "@/lib/razorpay";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request) {
@@ -56,12 +57,19 @@ export async function POST(request) {
       bankIfsc,
     });
 
-    const { error: upsertError } = await supabase.from("clipper_payout_accounts").upsert({
-      ...baseRow,
-      razorpay_account_id: account.id,
-      razorpay_product_id: productId,
-      status: "pending",
-    });
+    // status and razorpay_account_id are Razorpay's answer, not the user's, and
+    // approve/route.js gates the transfer on both. A guard trigger blocks
+    // authenticated callers from writing them, so this write goes through the
+    // service-role client — after the caller's ownership is already fixed by
+    // user_id above.
+    const { error: upsertError } = await createAdminClient()
+      .from("clipper_payout_accounts")
+      .upsert({
+        ...baseRow,
+        razorpay_account_id: account.id,
+        razorpay_product_id: productId,
+        status: "pending",
+      });
 
     if (upsertError) throw upsertError;
 

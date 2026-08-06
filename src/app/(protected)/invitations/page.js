@@ -53,8 +53,10 @@ export default async function InvitationsPage() {
 
     const brandIds = [...new Set(campaigns.map((c) => c.brand_id))];
     if (brandIds.length > 0) {
+      // brand_public — the invited clipper is not a workspace member, so the
+      // base table is not readable to them.
       const { data: brands } = await supabase
-        .from("brand_profiles")
+        .from("brand_public")
         .select("user_id, company_name")
         .in("user_id", brandIds);
       brandProfiles = brands ?? [];

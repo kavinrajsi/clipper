@@ -46,8 +46,11 @@ export async function withBrandInfo(supabase, campaigns) {
   if (brandIds.length === 0) return list;
 
   const [{ data: brandProfiles }, { data: accounts }] = await Promise.all([
+    // brand_public, not brand_profiles: the base table is workspace-scoped so a
+    // clipper browsing campaigns cannot read it. The view exposes only the
+    // brand's display identity, which is all this renders.
     supabase
-      .from("brand_profiles")
+      .from("brand_public")
       .select("user_id, company_name, logo_url")
       .in("user_id", brandIds),
     supabase.from("profiles").select("id, full_name").in("id", brandIds),

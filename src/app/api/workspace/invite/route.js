@@ -75,7 +75,11 @@ export async function POST(request) {
     });
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 400 });
+      console.error("Workspace member invite insert failed", insertError);
+      return NextResponse.json(
+        { error: "Couldn't add that person to the workspace." },
+        { status: 400 }
+      );
     }
     return NextResponse.json({ ok: true, status: "invited_existing" });
   }
@@ -108,7 +112,8 @@ export async function POST(request) {
         .insert({ workspace_id: workspaceId, email: normalised, role, invited_by: user.id });
 
   if (inviteError) {
-    return NextResponse.json({ error: inviteError.message }, { status: 400 });
+    console.error("Workspace pending invite write failed", inviteError);
+    return NextResponse.json({ error: "Couldn't send that invitation." }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true, status: "invited_pending_signup" });

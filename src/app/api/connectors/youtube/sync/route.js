@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { hasAppRole } from "@/lib/roles";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   fetchAllUploadedVideos,
@@ -34,6 +36,15 @@ export async function POST() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // /connectors is clipper-only via requireRole. The API has to agree, or a
+  // brand account can drive the whole flow straight past the hidden UI.
+  if (!(await hasAppRole(supabase, user, "clipper"))) {
+    return NextResponse.json(
+      { error: "Only creator accounts can connect a channel." },
+      { status: 403 }
+    );
+  }
+
   const { data: connection, error: connectionError } = await supabase
     .from("youtube_connections")
     .select("*")
@@ -43,6 +54,11 @@ export async function POST() {
   if (connectionError || !connection) {
     return NextResponse.json({ error: "No YouTube connection found" }, { status: 404 });
   }
+
+  // Reached only after the RLS-scoped read above proved this caller owns the
+  // connection. Used for the columns a guard trigger reserves to the pipeline;
+  // every row written through it is pinned to user.id.
+  const pipeline = createAdminClient();
 
   try {
     let accessToken = connection.access_token;
@@ -83,8 +99,13 @@ export async function POST() {
       (row) => row.video_id
     );
 
+    // youtube_videos is YouTube's data, not the user's — and view_count is a
+    // direct input to per-view payouts in approve/route.js. A guard trigger
+    // blocks authenticated writes to the whole table, so the sync (the only
+    // legitimate writer) goes through the service-role client. Every row is
+    // pinned to user.id below, so this grants no cross-user reach.
     if (videoRows.length > 0) {
-      const { error: videosError } = await supabase
+      const { error: videosError } = await pipeline
         .from("youtube_videos")
         .upsert(videoRows, { onConflict: "user_id,video_id" });
       if (videosError) throw videosError;

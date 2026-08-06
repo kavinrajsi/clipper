@@ -37,7 +37,8 @@ export async function POST(request, { params }) {
     .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Admin role update failed", error);
+    return NextResponse.json({ error: "Couldn't update that user's role." }, { status: 500 });
   }
 
   // Note: moving someone TO brand creates a workspace via

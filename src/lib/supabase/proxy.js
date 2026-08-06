@@ -23,6 +23,34 @@ const PROTECTED_PATH_PREFIXES = [
   "/studio",
 ];
 
+// Everything under /api is gated too, so a route that forgets getUser() is not
+// wide open. These are the exceptions: none of them is called by a signed-in
+// browser, and each authenticates itself. Proxying them would redirect every
+// delivery to /login and lose it silently.
+//
+//   /api/payments/webhook            Razorpay, HMAC signature
+//   /api/ai/webhook/*                Sarvam, shared token (constant-time)
+//   /api/cron/*                      Vercel Cron, CRON_SECRET bearer
+//   /api/connectors/youtube/callback Google, carries the OAuth state cookie
+//
+// Adding a route with a non-session caller? It goes here, and in AGENTS.md.
+const PUBLIC_API_PREFIXES = [
+  "/api/payments/webhook",
+  "/api/ai/webhook",
+  "/api/cron",
+  "/api/connectors/youtube/callback",
+];
+
+// API paths a browser navigates to rather than fetches. These want the login
+// page, not a 401 body nobody will ever see.
+const BROWSER_API_PATHS = ["/api/connectors/youtube/start"];
+
+// Prefix match on whole segments. A bare startsWith() made /campaigns-foo match
+// /campaigns, which is the fail-safe direction but still wrong.
+function matchesPrefix(pathname, prefix) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 export async function updateSession(request) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -58,8 +86,22 @@ export async function updateSession(request) {
   const { data } = await supabase.auth.getClaims();
 
   const { pathname } = request.nextUrl;
-  const isProtected = PROTECTED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  const isApi = pathname === "/api" || pathname.startsWith("/api/");
+  const isPublicApi = PUBLIC_API_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix));
+  const isProtected =
+    (isApi && !isPublicApi) ||
+    PROTECTED_PATH_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix));
+
   if (!data?.claims && isProtected) {
+    // A 302 to a login page is not something fetch() can act on, so API callers
+    // get a status they can branch on instead. This drops the refreshed cookies
+    // setAll() put on supabaseResponse — deliberate: there was no valid session
+    // to refresh, which is why we are here.
+    if (isApi && !BROWSER_API_PATHS.includes(pathname)) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

@@ -19,7 +19,7 @@ This section is a snapshot taken by reading the live codebase and the live Supab
 ## Route groups
 
 - `src/app/(app)/` — public pages (`/`, the marketing home page), wrapped in a plain `Header` (`src/components/header.jsx`) that shows Login/Sign up or the account dropdown.
-- `src/app/(protected)/` — authenticated app shell (`src/components/app-sidebar.jsx` + `src/components/site-header.jsx`), role-branched nav. All routes here go through `src/lib/supabase/proxy.js`'s `PROTECTED_PATH_PREFIXES` list (auth required) — **and add any new protected route to that list**, it's not automatic.
+- `src/app/(protected)/` — authenticated app shell (`src/components/app-sidebar.jsx` + `src/components/site-header.jsx`), role-branched nav. All routes here go through `src/lib/supabase/proxy.js`'s `PROTECTED_PATH_PREFIXES` list (auth required) — **and add any new protected route to that list**, it's not automatic. `/api/*` is the opposite: gated by default, with `PUBLIC_API_PREFIXES` naming the exemptions. Matching is segment-aware, so `/campaigns-foo` no longer matches `/campaigns`.
 - `src/app/(legal)/` — static content pages sharing one simple layout (`privacy`, `terms`, `clipper-terms`, `faq`, `support`) — reused for FAQ/Support despite the folder name; that's a deliberate naming shortcut, not a mistake.
 - Route group folder names never affect the URL — they're purely organizational.
 
@@ -39,6 +39,34 @@ Every table has RLS enabled. Three patterns recur — match one of them for new 
 3. **Service-role bypass** (`src/lib/supabase/admin.js`'s `createAdminClient()`) — used only for `/admin` and the payment routes that need to read a *different* user's `clipper_payout_accounts`/`youtube_videos` before creating a Razorpay transfer. Every route using it verifies the caller's ownership of the relevant row via the normal RLS-scoped client **first**, then switches to the admin client only for the specific cross-user reads/writes it actually needs. Never expose this client to a `"use client"` file.
 
 `campaign_payouts` has no client-side insert/update policy at all by design — every write there corresponds to a real Razorpay API call and only happens through the admin client.
+
+### ⚠ RLS cannot restrict WHICH COLUMNS an update touches
+
+This is the single most repeated mistake in this schema's history. A policy says
+*which rows* you may write; it says nothing about *which columns*. Anything a
+policy lets you update, you can update **every column of** — including the ones
+the server is supposed to own.
+
+Every table added after the baseline got a guard trigger for this reason
+(`tg_guard_source_asset_pipeline_columns`, `tg_guard_highlight_candidate_columns`,
+`tg_guard_profile_role`). The four baseline tables feeding the payout arithmetic
+did not, until `20260806023538` — and until then a clipper could set their own
+payout with one PATCH. The guarded columns now are:
+
+- `youtube_videos` — **no client write policy at all** (the sync route writes it on the service-role client)
+- `youtube_connections` — `payout_multiplier`, `verification_method`, `verified_at`, `bio_code_confirmed_at`, `verification_code`, `channel_id`
+- `clipper_payout_accounts` — `status`, `razorpay_account_id`, `razorpay_product_id`, `activation_status`
+- `campaign_applications` — `bid_amount`, `clipper_id`, `campaign_id` frozen after insert
+
+**Consequence for route code:** the connector and payout-account routes write
+those columns on `createAdminClient()`, *after* proving ownership on the
+RLS-scoped client. If you add a write to a guarded column through the normal
+client it will fail with `insufficient_privilege` — that is the guard working,
+not a bug.
+
+Guards use `pg_trigger_depth() > 1` to exempt nested writes, **not**
+`auth.uid() is null`. A signup can run with a JWT claim set, and keying the
+exemption on a null uid broke brand signup outright — the RLS suite caught it.
 
 ### ⚠ Policy cycles — read before adding an RLS policy
 
@@ -66,7 +94,7 @@ Related: `eslint.config.mjs` enables `no-undef` because `next build` does not re
 - **All writes go through `src/lib/ai/jobs.js` on a service-role client.** `ai_jobs` has no client insert/update/delete policy at all, same rule as `campaign_payouts`: `status`, `model`, `tokens_used` and `credits_charged` are the provider's account of what happened and what it cost. Every transition filters on the open states, so a replayed webhook or a racing poller is a no-op rather than an overwrite.
 - **`source_assets` is written by both the user and the pipeline**, and a trigger enforces the split: a signed-in user may rename an asset, but only the pipeline (where `auth.uid()` is null) may write `status`, `transcript`, `duration_seconds`, `storage_path` or `workspace_id`.
 - **Transcription is poll-first.** `/api/cron/ai-jobs` is the mechanism; the Sarvam webhook is a latency optimisation that can be dropped. Sarvam's callback carries a job state and **no transcript**, so both paths run the same `reconcileJob`, which fetches the transcript itself. The poller also sweeps jobs whose relay died — nothing else can, because the terminal-status-requires-`completed_at` constraint means a `running` row with a dead owner sits there forever.
-- **`/api/ai/webhook/*` must stay out of `PROTECTED_PATH_PREFIXES`.** Sarvam arrives unauthenticated; auth is a constant-time token compare, the same shape as the Razorpay webhook's signature check. Proxying it would redirect every delivery to `/login`.
+- **`/api/ai/webhook/*` must stay in `PUBLIC_API_PREFIXES`.** Everything under `/api` is now auth-gated by the proxy as a backstop, so the exemption list is what keeps unauthenticated callers working. Sarvam arrives unauthenticated; auth is a constant-time token compare, the same shape as the Razorpay webhook's signature check. Dropping it from that list would 401 every delivery. The other exemptions are `/api/payments/webhook`, `/api/cron`, and `/api/connectors/youtube/callback` — **any new route with a non-session caller goes in that list too.**
 - **The model proposes, the human decides — and that split is enforced twice.** `source_assets` and `highlight_candidates` both let a member change exactly one thing (the filename; whether a moment is picked) and let the pipeline change everything else, via a trigger keyed on `auth.uid()` being null. Neither has a client insert or delete policy. A client that could write a highlight candidate could hand brief generation a moment that never happens in the recording.
 - **AI SDK v7 uses `generateText` + `Output.object()`, not `generateObject`.** Model IDs go through the Vercel AI Gateway as plain `provider/model` strings and should be **fetched from `https://ai-gateway.vercel.sh/v1/models`, never recalled** — they move. A JSON schema constrains the shape of what a model returns and says nothing about whether it makes sense, so `validateCandidates()` in `src/lib/ai/highlights.js` is the layer that decides what gets stored; `npm run highlights:check` is what tests it, with no key and no network.
 - **Brief generation never lets the model supply a timestamp.** It writes the prose; the clip bounds in `campaigns.requirements` are rendered from the `highlight_candidates` rows. A hallucinated "cut from 14:32" sends a creator to a moment that does not exist, and they find out after doing the work. `npm run brief:check` asserts that a model returning injected timestamps, too few angles, too many, or outright garbage still produces a correct clip list.
@@ -127,8 +155,12 @@ If only the first pair flips, that is a **second support request, not a bug** �
 - Google OAuth signup skips any role picker — always defaults to `clipper`; changing role happens on `/profile` afterward.
 - No brand-facing billing/spend-history page (aggregate spend across campaigns).
 - Cancelling a funded campaign doesn't refund or reconcile the held Razorpay funds. Nor does *normal completion* — a campaign funded at ₹100,000 that pays out ₹60,000 leaves ₹40,000 in the platform account with no code path to return it. Underspend is the normal case for per-view campaigns, not an edge case. The Refunds API is available and supports partial refunds, so this is buildable today; it just isn't built.
-- Per-view payouts depend on the clipper having synced the submitted video via Connectors — if it's not in `youtube_videos`, the payout falls back to a submission-time snapshot (`view_count_at_submission`), which may be `null` if that wasn't captured either.
+- Per-view payouts **require** the clipper to have synced the submitted video via Connectors. If the URL doesn't parse as a YouTube video, or there's no matching `youtube_videos` row, `/api/payments/submissions/[id]/approve` returns 400 telling the brand to ask the creator to sync. There is deliberately **no fallback** to `view_count_at_submission` — that column is written by the clipper's own browser, so using it meant the payee chose their own payout. It survives as a display-only snapshot.
 - Brand-only pages aren't route-gated by role (see "Auth and roles" above).
+- **`youtube_connections.access_token`/`refresh_token` and `clipper_payout_accounts.pan`/`bank_account_number` are stored in plaintext.** Known and accepted for now: encrypting them is a key-management decision (Vault vs pgsodium vs app-level AES), not a migration, and doing it badly puts the key next to the data. Needs its own design pass.
+- **CSP ships as `Content-Security-Policy-Report-Only`** (`next.config.mjs`). The other security headers are enforced. Switch the CSP key to enforcing once reports are quiet — the risk is the Razorpay checkout script and the YouTube IFrame API, both loaded at runtime.
+- **`brand_profiles` is workspace-scoped; `public.brand_public` is the view for cross-user display identity** (`user_id`, `company_name`, `logo_url`). A clipper browsing campaigns cannot read the base table — use the view, as `src/lib/campaigns.js` and `/invitations` do.
+- `profiles` keeps its `using (true)` select policy deliberately — see `20260806023540` for why narrowing it is a bigger job than it looks.
 
 ## Local stack and migration history
 
